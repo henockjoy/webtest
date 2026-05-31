@@ -125,7 +125,8 @@ Support: @{}"""
 /settings - to change group settings as your wish
 /connect - to connect group settings to PM
 /id - to check group or channel id
-/download - Download videos from YouTube, Facebook, TikTok, Instagram, and more platforms.</b>"""
+/download - Download videos from YouTube, Facebook, TikTok, Instagram, and more platforms.
+/request - request a new movie and tv series</b>"""
     
     SOURCE_TXT = """<b>ʙᴏᴛ ɢɪᴛʜᴜʙ ʀᴇᴘᴏsɪᴛᴏʀʏ -
 

@@ -66,6 +66,13 @@ if len(UPDATES_SEND_CHANNEL) == 0:
 else:
     UPDATES_SEND_CHANNEL = int(UPDATES_SEND_CHANNEL)
 
+REQUESTS_CHANNEL = environ.get('REQUESTS_CHANNEL', '')
+if len(REQUESTS_CHANNEL) == 0:
+    logger.info('REQUESTS_CHANNEL is missing, using LOG_CHANNEL')
+    REQUESTS_CHANNEL = LOG_CHANNEL
+else:
+    REQUESTS_CHANNEL = int(REQUESTS_CHANNEL)
+
 # support group
 SUPPORT_GROUP = environ.get('SUPPORT_GROUP', '')
 if len(SUPPORT_GROUP) == 0:

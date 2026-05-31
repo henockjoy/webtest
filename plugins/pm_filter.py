@@ -83,15 +83,8 @@ async def group_search(client, message):
         if message.text.startswith("/") or re.findall(r'https?://\S+|www\.\S+|t\.me/\S+|@\w+', message.text):
             return
 
-        if '#request' in message.text.lower():
-            if message.from_user.id in ADMINS:
-                return
-            await client.send_message(LOG_CHANNEL, f"#Request\n★ User: {message.from_user.mention}\n★ Group: {message.chat.title}\n\n★ Message: {re.sub(r'#request', '', message.text.lower())}")
-            await message.reply_text("Request sent!")
-            return  
-        else:
-            s = await message.reply(f"<b><i>🔎 `{message.text}` searching...</i></b>")
-            await auto_filter(client, message, s)
+        s = await message.reply(f"<b><i>🔎 `{message.text}` searching...</i></b>")
+        await auto_filter(client, message, s)
     else:
         k = await message.reply_text('Auto Filter Off! ❌')
         await asyncio.sleep(5)
@@ -374,6 +367,43 @@ async def advantage_spoll_choker(bot, query):
             await query.message.reply_to_message.delete()
         except:
             pass
+
+
+@Client.on_callback_query(filters.regex(r"^req_completed"))
+async def request_completed(client, query):
+    _, req_id = query.data.split("#")
+    req = await db.get_movie_req(req_id)
+    if not req:
+        return await query.answer("Request not found in database!", show_alert=True)
+    
+    user_id = req['user_id']
+    movie_name = req['movie_name']
+    
+    try:
+        await client.send_message(user_id, f"✅ Your request for **{movie_name}** has been uploaded!")
+    except:
+        pass
+        
+    await query.edit_message_text(f"{query.message.text}\n\n**Status:** ✅ Completed")
+    await db.del_movie_req(req_id)
+
+@Client.on_callback_query(filters.regex(r"^req_reject"))
+async def request_rejected(client, query):
+    _, req_id = query.data.split("#")
+    req = await db.get_movie_req(req_id)
+    if not req:
+        return await query.answer("Request not found in database!", show_alert=True)
+    
+    user_id = req['user_id']
+    movie_name = req['movie_name']
+    
+    try:
+        await client.send_message(user_id, f"❌ Your request for **{movie_name}** has been rejected.")
+    except:
+        pass
+        
+    await query.edit_message_text(f"{query.message.text}\n\n**Status:** ❌ Rejected")
+    await db.del_movie_req(req_id)
 
 
 @Client.on_callback_query()

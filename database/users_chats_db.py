@@ -52,6 +52,7 @@ class Database:
         self.req = data_db.Requests
         self.con = data_db.Connections
         self.stg = data_db.Settings
+        self.movie_req = data_db.MovieRequests
 
     def new_user(self, id, name):
         return dict(
@@ -258,5 +259,15 @@ class Database:
 
     async def set_repair_mode(self, value: bool):
         await self.update_bot_sttgs('REPAIR_MODE', value)
+
+    async def add_movie_req(self, req_id, user_id, movie_name):
+        await self.movie_req.insert_one({'req_id': req_id, 'user_id': user_id, 'movie_name': movie_name})
+
+    async def get_movie_req(self, req_id):
+        req = await self.movie_req.find_one({'req_id': req_id})
+        return req
+
+    async def del_movie_req(self, req_id):
+        await self.movie_req.delete_many({'req_id': req_id})
 
 db = Database()

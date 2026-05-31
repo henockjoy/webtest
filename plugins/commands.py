@@ -10,7 +10,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LinkPrevi
 from database.ia_filterdb import db_count_documents, second_db_count_documents, get_file_details, delete_files
 from database.users_chats_db import db
 from datetime import datetime, timedelta
-from info import PREMIUM_PLANS, EFFECT_IDS, OWNER_USERNAME, IS_PREMIUM, URL, BIN_CHANNEL, SECOND_FILES_DATABASE_URL, INDEX_CHANNELS, ADMINS, IS_VERIFY, VERIFY_TUTORIAL, VERIFY_EXPIRE, SHORTLINK_API, SHORTLINK_URL, DELETE_TIME, SUPPORT_LINK, UPDATES_LINK, LOG_CHANNEL, PICS, IS_STREAM, REACTIONS, PM_FILE_DELETE_TIME
+from info import REQUESTS_CHANNEL, PREMIUM_PLANS, EFFECT_IDS, OWNER_USERNAME, IS_PREMIUM, URL, BIN_CHANNEL, SECOND_FILES_DATABASE_URL, INDEX_CHANNELS, ADMINS, IS_VERIFY, VERIFY_TUTORIAL, VERIFY_EXPIRE, SHORTLINK_API, SHORTLINK_URL, DELETE_TIME, SUPPORT_LINK, UPDATES_LINK, LOG_CHANNEL, PICS, IS_STREAM, REACTIONS, PM_FILE_DELETE_TIME
 from utils import get_plan_name, get_poster, is_premium, upload_image, get_settings, get_size, is_subscribed, is_check_admin, get_shortlink, get_verify_status, update_verify_status, save_group_settings, temp, get_readable_time, get_wish, get_seconds
 import PTN
 
@@ -652,4 +652,30 @@ async def repairmode(bot, message):
     else:
         await db.set_repair_mode(False)
         await message.reply("<b>Repair Mode Disabled!</b>\n\nBot is back online. Users can search and get files normally.")
+
+
+@Client.on_message(filters.command('request'))
+async def request_cmd(bot, message):
+    if len(message.command) < 2:
+        return await message.reply("⚠️ Please provide a movie/tv show name.\n\nExample: `/request Interstellar`")
+        
+    movie_name = message.text.split(" ", 1)[1]
+    req_id = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    
+    await db.add_movie_req(req_id, message.from_user.id, movie_name)
+    
+    btn = [[
+        InlineKeyboardButton("✅ Completed", callback_data=f"req_completed#{req_id}"),
+        InlineKeyboardButton("❌ Reject", callback_data=f"req_reject#{req_id}")
+    ]]
+    
+    try:
+        await bot.send_message(
+            REQUESTS_CHANNEL, 
+            f"#Request\n\n★ User: {message.from_user.mention}\n★ User ID: `{message.from_user.id}`\n\n★ Message: {movie_name}",
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
+        await message.reply("✅ Your request has been sent successfully!")
+    except Exception as e:
+        await message.reply(f"Failed to send request. Error: {e}")
 
