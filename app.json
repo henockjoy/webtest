@@ -1,7 +1,7 @@
 {
     "name": "Auto Filter Bot",
     "description": "A Telegram bot for auto-filtering movies.",
-    "repository": "https://github.com/HA-Bots/Auto-Filter-Bot",
+    "repository": "https://github.com/henockjoy/webtest",
     "keywords": ["telegram", "bot", "filter", "automation"],
     "buildpacks": [
       {
