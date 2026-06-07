@@ -9,11 +9,66 @@ from web.utils.render_template import media_watch, error_tmplt, webapp_template,
 from database.ia_filterdb import get_search_results
 from database.users_chats_db import db
 import json, io, aiohttp
+import re
+from difflib import SequenceMatcher
+import PTN
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 routes = web.RouteTableDef()
 
 TMDB_BASE = "https://api.themoviedb.org/3"
+
+def normalize_title(value):
+    value = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    noise = {
+        "the", "a", "an", "movie", "series", "season", "episode", "complete",
+        "hindi", "english", "tamil", "telugu", "malayalam", "kannada", "dual",
+        "audio", "web", "dl", "webrip", "bluray", "hdrip", "x264", "x265",
+        "hevc", "aac", "esub", "subs", "subtitle", "480p", "720p", "1080p", "2160p"
+    }
+    return " ".join(part for part in value.split() if part not in noise)
+
+def file_model(file):
+    name = file.get("file_name", "Unknown")
+    parsed = PTN.parse(name)
+    title = parsed.get("title") or name
+    season = parsed.get("season")
+    episode = parsed.get("episode")
+    year = parsed.get("year")
+    return {
+        "id": str(file["_id"]),
+        "name": name,
+        "size": get_size(file.get("file_size", 0)),
+        "raw_size": file.get("file_size", 0),
+        "title": title,
+        "year": year,
+        "season": int(season) if str(season).isdigit() else season,
+        "episode": int(episode) if str(episode).isdigit() else episode,
+    }
+
+def match_file_to_tmdb(file, title, year=None, media_type=None):
+    model = file_model(file)
+    target = normalize_title(title)
+    parsed_title = normalize_title(model["title"])
+    file_name = normalize_title(model["name"])
+    if not target:
+        model["match_score"] = 0
+        return model
+
+    title_score = SequenceMatcher(None, target, parsed_title).ratio()
+    name_score = SequenceMatcher(None, target, file_name).ratio()
+    contains_score = 1.0 if target in file_name or target in parsed_title else 0
+    score = max(title_score, name_score, contains_score)
+
+    if year and model.get("year") and str(model["year"]) == str(year):
+        score += 0.08
+    if media_type == "tv" and model.get("season") is not None:
+        score += 0.05
+    if media_type == "movie" and model.get("season") is None:
+        score += 0.03
+
+    model["match_score"] = round(score, 4)
+    return model
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
@@ -94,26 +149,46 @@ async def submit_payment_handler(request):
 @routes.get("/api/search")
 async def api_search_handler(request):
     query = request.query.get('q', '').strip()
+    media_type = request.query.get('type', '').strip()
+    year = request.query.get('year', '').strip()
     offset = int(request.query.get('offset', 0))
   
-    files = await get_search_results(query)
-    files, next_offset, total_results = await handle_next_back(files, offset=offset, max_results=MAX_BTN)
+    search_terms = [query]
+    compact_query = re.sub(r"[^A-Za-z0-9 ]+", " ", query).strip()
+    if compact_query and compact_query not in search_terms:
+        search_terms.append(compact_query)
+    for word in compact_query.split():
+        if len(word) >= 4 and word.lower() not in {"the", "and", "with", "from"}:
+            search_terms.append(word)
+
+    found = {}
+    for term in search_terms:
+        for file in await get_search_results(term):
+            found[file["_id"]] = file
+
+    ranked_files = [
+        model for model in (
+            match_file_to_tmdb(file, query, year=year, media_type=media_type)
+            for file in found.values()
+        )
+        if model["match_score"] >= 0.42
+    ]
+    ranked_files.sort(key=lambda f: (
+        f.get("season") if isinstance(f.get("season"), int) else 999,
+        f.get("episode") if isinstance(f.get("episode"), int) else 999,
+        -f["match_score"],
+        f["name"].lower()
+    ))
+
+    total_results = len(ranked_files)
+    files, next_offset, _ = await handle_next_back(ranked_files, offset=offset, max_results=MAX_BTN * 5)
     
-    formatted_files = []
-    if files:
-        for file in files:
-            formatted_files.append({
-                "id": str(file['_id']),
-                "name": file.get('file_name', 'Unknown'),
-                "size": get_size(file.get('file_size', 0))
-            })
- 
     return web.json_response({
-        "files": formatted_files,
+        "files": files,
         "next_offset": next_offset if next_offset != 0 else None,
         "total_results": total_results,
         "current_offset": offset,
-        "max_btn": MAX_BTN,
+        "max_btn": MAX_BTN * 5,
         "bot_username": temp.U_NAME
     })
 
