@@ -14,9 +14,9 @@ class script(object):
 ★ Language: <a href=https://www.python.org>Python</a>
 ★ Library: <a href=https://kurigram.icu/>Kurigram</a>"""
 
-    MY_OWNER_TXT = """★ Name: HA Bots
-★ Username: @HA_Bots
-★ Country: Sri Lanka 🇱🇰"""
+    MY_OWNER_TXT = """★ Name: FT Admin
+★ Username: @FTAdminbot
+★ Country: India"""
 
     STATUS_TXT = """👤 Total Users: <code>{}</code>
 😎 Premium Users: <code>{}</code>
@@ -49,22 +49,21 @@ I can't find the <b>{}</b> in my database! 🥲
 👉 Please read the Instructions to get better results.
 👉 Or not been released yet."""
     
-    IMDB_TEMPLATE = """✅ I Found: <code>{query}</code>
+    IMDB_TEMPLATE = """<u><b>{title}</b></u>
+    
+‣ 𝖸𝖾𝖺𝗋: {year} 
+‣ 𝖦𝖾𝗇𝗋𝖾: {genres}
+‣ 𝖱𝖺𝗍𝗂𝗇𝗀: {rating} / 10
+‣ 𝖱𝗎𝗇𝖳𝗂𝗆𝖾: {runtime} Minutes
+‣ 𝖱𝖾𝗊𝗎𝖾𝗌𝗍𝖾𝖽 𝖡𝗒: {message.from_user.mention}
 
-🏷 Title: <a href={url}>{title}</a>
-🎭 Genres: {genres}
-📆 Year: {year}
-🌟 Rating: {rating} / 10
-☀️ Languages: {languages}
-📀 RunTime: {runtime} Minutes
+‣ 𝖯𝗅𝗈𝗍: {plot}‌"""
 
-🗣 Requested by: {message.from_user.mention}
-©️ Powered by: <b>{message.chat.title}</b>"""
-
-    FILE_CAPTION = """<i>{file_name}</i>
+    FILE_CAPTION = """<blockquote><b>{file_name}</b>
+    
+<code>{file_caption}</code></blockquote>
 
 🚫 ᴘʟᴇᴀsᴇ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ᴄʟᴏsᴇ ʙᴜᴛᴛᴏɴ ɪꜰ ʏᴏᴜ ʜᴀᴠᴇ sᴇᴇɴ ᴛʜᴇ ᴍᴏᴠɪᴇ 🚫"""
-
     WELCOME_TEXT = """👋 Hello {mention}, Welcome to {title} group! 💞"""
 
     HELP_TXT = """👋 Hello {},
@@ -128,20 +127,11 @@ Support: @{}"""
 /download - Download videos from YouTube, Facebook, TikTok, Instagram, and more platforms.
 /request - request a new movie and tv series</b>"""
     
-    SOURCE_TXT = """<b>ʙᴏᴛ ɢɪᴛʜᴜʙ ʀᴇᴘᴏsɪᴛᴏʀʏ -
-
-- ᴛʜɪꜱ ʙᴏᴛ ɪꜱ ᴀɴ ᴏᴘᴇɴ ꜱᴏᴜʀᴄᴇ ᴘʀᴏᴊᴇᴄᴛ.
-
-- ꜱᴏᴜʀᴄᴇ - <a href=https://github.com/HA-Bots/Auto-Filter-Bot>ʜᴇʀᴇ</a>
-
-- ᴅᴇᴠʟᴏᴘᴇʀ - @HA_Bots"""
+    SOURCE_TXT = """The VOID..."""
 
 
-    NEW_ADDED_TEMPLATE = """✅ New Added ✅
+    NEW_ADDED_TEMPLATE = """<b>✅{title} {year}</b>
+<code>⏱ {runtime} Min | ⭐ {rating}</code>
 
-🏷 Title: <a href={url}>{title}</a>
-🎭 Genres: {genres}
-📆 Year: {year}
-🌟 Rating: {rating} / 10
-☀️ Languages: {languages}
-📀 RunTime: {runtime} Minutes"""
+<blockquote><b>🎙 {languages}</b></blockquote>
+📽 Genre:</b> {genres}"""
