@@ -39,10 +39,10 @@ BOT_ID = BOT_TOKEN.split(":")[0]
 PORT = int(environ.get('PORT', '80'))
 
 # Upload your images to "postimages.org" and get direct link
-PICS = (environ.get('PICS', 'https://i.postimg.cc/8C15CQ5y/1.png https://i.postimg.cc/gcNtrv0m/2.png https://i.postimg.cc/cHD71BBz/3.png https://i.postimg.cc/F1XYhY8q/4.png https://i.postimg.cc/1tNwGVxC/5.png https://i.postimg.cc/dtW30QpL/6.png https://i.postimg.cc/139dvs3c/7.png https://i.postimg.cc/QtXVtB8K/8.png https://i.postimg.cc/y8j8G1XV/9.png https://i.postimg.cc/zDF6KyJX/10.png https://i.postimg.cc/fyycVqzd/11.png https://i.postimg.cc/26ZBtBZr/13.png https://i.postimg.cc/PJn8nrWZ/14.png https://i.postimg.cc/cC7txyhz/15.png https://i.postimg.cc/kX9tjGXP/16.png https://i.postimg.cc/zXjH4NVb/17.png https://i.postimg.cc/sggGrLhn/18.png https://i.postimg.cc/y8pgYTh7/19.png')).split()
+PICS = (environ.get('PICS', 'https://graph.org/file/288c0474120109abe06e8-abcd91178c24aae954.jpg https://graph.org/file/31647c854c76a2b73a54e-10c911dd1cf4795f4e.jpg https://graph.org/file/196912fbfb52e2876bfc6-750b13863867e44f25.jpg https://graph.org/file/619a0226a5f922bf5784d-2b053b8a15e849dc06.jpg https://graph.org/file/d3bb86bec43ed5c10fe31-7cb95f8b834bd9442e.jpg')).split()
 
 # Bot Admins
-ADMINS = environ.get('ADMINS', '5493832202')
+ADMINS = environ.get('ADMINS', '1824857814')
 if len(ADMINS) == 0:
     logger.error('ADMINS is missing, exiting now')
     exit()
@@ -66,7 +66,7 @@ if len(UPDATES_SEND_CHANNEL) == 0:
 else:
     UPDATES_SEND_CHANNEL = int(UPDATES_SEND_CHANNEL)
 
-REQUESTS_CHANNEL = environ.get('REQUESTS_CHANNEL', '')
+REQUESTS_CHANNEL = environ.get('REQUESTS_CHANNEL', '-1001863319697')
 if len(REQUESTS_CHANNEL) == 0:
     logger.info('REQUESTS_CHANNEL is missing, using LOG_CHANNEL')
     REQUESTS_CHANNEL = LOG_CHANNEL
@@ -74,7 +74,7 @@ else:
     REQUESTS_CHANNEL = int(REQUESTS_CHANNEL)
 
 # support group
-SUPPORT_GROUP = environ.get('SUPPORT_GROUP', '')
+SUPPORT_GROUP = environ.get('SUPPORT_GROUP', '-1001771340892')
 if len(SUPPORT_GROUP) == 0:
     logger.error('SUPPORT_GROUP is missing, exiting now')
     exit()
@@ -93,30 +93,30 @@ if len(FILES_DATABASE_URL) == 0:
 SECOND_FILES_DATABASE_URL = environ.get('SECOND_FILES_DATABASE_URL', "")
 if len(SECOND_FILES_DATABASE_URL) == 0:
     logger.info('SECOND_FILES_DATABASE_URL is empty')
-DATABASE_NAME = environ.get('DATABASE_NAME', "Cluster0")
-COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Files')
+DATABASE_NAME = environ.get('DATABASE_NAME', "yoonbot")
+COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Cluster0')
 
 # Links
-SUPPORT_LINK = environ.get('SUPPORT_LINK', 'https://t.me/HA_Bots_Support')
-UPDATES_LINK = environ.get('UPDATES_LINK', 'https://t.me/HA_Bots')
-FILMS_LINK = environ.get('FILMS_LINK', 'https://t.me/HA_Films_World')
-TUTORIAL = environ.get("TUTORIAL", "https://t.me/HA_Bots")
-VERIFY_TUTORIAL = environ.get("VERIFY_TUTORIAL", "https://t.me/HA_Bots")
+SUPPORT_LINK = environ.get('SUPPORT_LINK', 'https://t.me/TeamYoonseri')
+UPDATES_LINK = environ.get('UPDATES_LINK', 'https://t.me/FT_Channels')
+FILMS_LINK = environ.get('FILMS_LINK', 'https://t.me/FT_Chatz')
+TUTORIAL = environ.get("TUTORIAL", "https://t.me/FT_Channels")
+VERIFY_TUTORIAL = environ.get("VERIFY_TUTORIAL", "https://t.me/FT_Channels")
 
 # Bot settings
 TIME_ZONE = environ.get('TIME_ZONE', 'Asia/Colombo') # Replace your time zone
 DELETE_TIME = int(environ.get('DELETE_TIME', 3600)) # Add time in seconds
 CACHE_TIME = int(environ.get('CACHE_TIME', 300))
-MAX_BTN = int(environ.get('MAX_BTN', 8))
-LANGUAGES = [language.lower() for language in environ.get('LANGUAGES', 'hindi english telugu tamil kannada malayalam marathi punjabi').split()]
-QUALITY = [quality.lower() for quality in environ.get('QUALITY', '360p 480p 720p 1080p 2160p').split()]
+MAX_BTN = int(environ.get('MAX_BTN', 100))
+LANGUAGES = [language.lower() for language in environ.get('LANGUAGES', 'Hindi English Telugu Tamil Kannada Malayalam Marathi Punjabi Korean Chinese Japanese Spanish French Portuguese Italian Urdu Turkish').split()]
+QUALITY = [quality.lower() for quality in environ.get('QUALITY', '240p 360p 480p 576p 720p 1080p 2160p').split()]
 IMDB_TEMPLATE = environ.get("IMDB_TEMPLATE", script.IMDB_TEMPLATE)
 FILE_CAPTION = environ.get("FILE_CAPTION", script.FILE_CAPTION)
 SHORTLINK_URL = environ.get("SHORTLINK_URL", "mdiskshortner.link")
-SHORTLINK_API = environ.get("SHORTLINK_API", "36f1ae74ba1aa01e5bd73bdd0bc22aa915443501")
+SHORTLINK_API = environ.get("SHORTLINK_API", "20f1563cb983df6bcb0bfd7576d929909adccabe")
 VERIFY_EXPIRE = int(environ.get('VERIFY_EXPIRE', 86400)) # Add time in seconds
 WELCOME_TEXT = environ.get("WELCOME_TEXT", script.WELCOME_TEXT)
-INDEX_EXTENSIONS = [extensions.lower() for extensions in environ.get('INDEX_EXTENSIONS', 'mp4 mkv').split()]
+INDEX_EXTENSIONS = [extensions.lower() for extensions in environ.get('INDEX_EXTENSIONS', 'mp4 mkv avi').split()]
 PM_FILE_DELETE_TIME = int(environ.get('PM_FILE_DELETE_TIME', '3600'))
 
 # boolean settings
@@ -127,19 +127,19 @@ WELCOME = is_enabled('WELCOME', False)
 PROTECT_CONTENT = is_enabled('PROTECT_CONTENT', False)
 LONG_IMDB_DESCRIPTION = is_enabled("LONG_IMDB_DESCRIPTION", False)
 LINK_MODE = is_enabled("LINK_MODE", True)
-IMDB = is_enabled('IMDB', True)
+IMDB = is_enabled('IMDB', False)
 SPELL_CHECK = is_enabled("SPELL_CHECK", True)
 SHORTLINK = is_enabled('SHORTLINK', False)
 
 # for stream
 IS_STREAM = is_enabled('IS_STREAM', True)
-BIN_CHANNEL = environ.get("BIN_CHANNEL", "")
+BIN_CHANNEL = environ.get("BIN_CHANNEL", "-1003052098698")
 if len(BIN_CHANNEL) == 0:
     logger.error('BIN_CHANNEL is missing, exiting now')
     exit()
 else:
     BIN_CHANNEL = int(BIN_CHANNEL)
-URL = environ.get("URL", "")
+URL = environ.get("URL", "https://web-production-81c4b.up.railway.app/")
 if len(URL) == 0:
     logger.error('URL is missing, exiting now')
     exit()
@@ -158,10 +158,10 @@ REACTIONS = [reactions for reactions in environ.get('REACTIONS', '🤝 😇 🤗
 EFFECT_IDS = [effect for effect in environ.get('EFFECT_IDS', '5104841245755180586 5104858069142078462 5159385139981059251 5046509860389126442 5046589136895476101 5107584321108051014').split()]
 
 # for Premium 
-IS_PREMIUM = is_enabled('IS_PREMIUM', True)
-OWNER_USERNAME = environ.get("OWNER_USERNAME", "Hansaka_Anuhas")
-PAYMENT_QR_CODE = "https://i.postimg.cc/4xmm21x5/qr-code.jpg" # add your payment qr code link, like upi qr code or any crypto qr code link
-PAYMENT_ID = "mypayment@id"  # add your payment id like upi id or crypto address
+IS_PREMIUM = is_enabled('IS_PREMIUM', False)
+OWNER_USERNAME = environ.get("OWNER_USERNAME", "FTAdminbot")
+PAYMENT_QR_CODE = "https://i.postimg.cc/d09Z2z3p/no-qr-code-sign-isolated-white-background-vector-illustration-234692015.webp" # add your payment qr code link, like upi qr code or any crypto qr code link
+PAYMENT_ID = "henockjoy65-1@okaxis"  # add your payment id like upi id or crypto address
 
 # Format -- Days: ['CURRENCY', Price]
 PREMIUM_PLANS = {
@@ -174,7 +174,7 @@ PAYMENT_TYPE = "UPI"  # can be changed to "Crypto (TRC20)" or "PayPal" or etc...
 
 
 # for TMDb
-TMDB_API_KEY = environ.get("TMDB_API_KEY", "")  # Get API key from here - https://www.themoviedb.org/settings/api
+TMDB_API_KEY = environ.get("TMDB_API_KEY", "0da1b0909b6f81d9543daf54db258f5a")  # Get API key from here - https://www.themoviedb.org/settings/api
 if len(TMDB_API_KEY) == 0:
     logger.info('TMDB_API_KEY is missing')
     TMDB_API_KEY = None
