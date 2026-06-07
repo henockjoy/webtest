@@ -438,6 +438,38 @@ webapp_template = """
             display: flex; align-items: center; justify-content: center;
             color: var(--accent);
         }
+        .season-strip {
+            display: flex; gap: 8px; overflow-x: auto;
+            padding: 0 8px 12px; margin: 0 0 8px;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+        }
+        .season-strip::-webkit-scrollbar { display: none; }
+        .season-btn {
+            flex: 0 0 auto; scroll-snap-align: start;
+            border: 1px solid var(--border); background: var(--card2);
+            color: var(--text2); border-radius: 999px;
+            padding: 9px 14px; font-family: 'Outfit', sans-serif;
+            font-size: 12px; font-weight: 700; cursor: pointer;
+            white-space: nowrap; transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .season-btn.active {
+            background: var(--accent); color: #fff;
+            border-color: rgba(229,9,20,0.75);
+        }
+        .episode-panel { display: flex; flex-direction: column; gap: 4px; }
+        .episode-kicker {
+            font-size: 11px; font-weight: 700; color: var(--text3);
+            text-transform: uppercase; letter-spacing: 0.7px;
+            padding: 2px 12px 8px;
+        }
+        .episode-number {
+            width: 38px; height: 38px; border-radius: var(--radius-sm);
+            background: rgba(229,9,20,0.13); color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; font-size: 12px; font-weight: 800;
+            border: 1px solid rgba(229,9,20,0.18);
+        }
         .modal-loading {
             text-align: center; padding: 40px 20px; color: var(--text3);
             font-size: 14px;
@@ -997,41 +1029,134 @@ function handleBackdropClick(e) {
     if (e.target === document.getElementById('modalBackdrop')) closeModal();
 }
 
+function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function episodeLabel(file) {
+    if (file.episode !== null && file.episode !== undefined && file.episode !== '') {
+        return `E${String(file.episode).padStart(2, '0')}`;
+    }
+    return 'File';
+}
+
+function seasonLabel(season) {
+    return season === 'other' ? 'Other' : `Season ${season}`;
+}
+
+function renderFileRow(file, compact=false) {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+    const lead = compact
+        ? `<div class="episode-number">${episodeLabel(file)}</div>`
+        : `<div class="file-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </div>`;
+    el.innerHTML = `
+        ${lead}
+        <div class="file-item-info">
+            <div class="file-item-name">${escapeHTML(file.name)}</div>
+            <div class="file-item-size">${escapeHTML(file.size)}</div>
+        </div>
+        <div class="file-item-get">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+        </div>
+    `;
+    el.onclick = () => getFile(file.id);
+    return el;
+}
+
+async function fetchFilesForItem(item) {
+    let offset = 0;
+    let files = [];
+    for (let page = 0; page < 10; page++) {
+        const params = new URLSearchParams({
+            q: item.title,
+            type: item.type || '',
+            year: item.year || '',
+            offset: String(offset)
+        });
+        const resp = await fetch(`/api/search?${params.toString()}`);
+        const data = await resp.json();
+        botUsername = data.bot_username || botUsername;
+        files = files.concat(data.files || []);
+        if (!data.next_offset) break;
+        offset = data.next_offset;
+    }
+    return files;
+}
+
+function renderSeasonFiles(filesEl, files) {
+    const seasons = new Map();
+    files.forEach(file => {
+        const key = Number.isInteger(file.season) ? file.season : 'other';
+        if (!seasons.has(key)) seasons.set(key, []);
+        seasons.get(key).push(file);
+    });
+
+    const keys = Array.from(seasons.keys()).sort((a, b) => {
+        if (a === 'other') return 1;
+        if (b === 'other') return -1;
+        return a - b;
+    });
+    let active = keys[0];
+
+    const strip = document.createElement('div');
+    strip.className = 'season-strip';
+    const panel = document.createElement('div');
+    panel.className = 'episode-panel';
+
+    function drawSeason(key) {
+        active = key;
+        strip.querySelectorAll('.season-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.season === String(key));
+        });
+        const seasonFiles = [...seasons.get(key)].sort((a, b) => {
+            const epA = Number.isInteger(a.episode) ? a.episode : 9999;
+            const epB = Number.isInteger(b.episode) ? b.episode : 9999;
+            return epA - epB || a.name.localeCompare(b.name);
+        });
+        panel.innerHTML = `<div class="episode-kicker">${seasonFiles.length} file${seasonFiles.length === 1 ? '' : 's'} in ${seasonLabel(key)}</div>`;
+        seasonFiles.forEach(file => panel.appendChild(renderFileRow(file, true)));
+    }
+
+    keys.forEach(key => {
+        const btn = document.createElement('button');
+        btn.className = 'season-btn';
+        btn.dataset.season = String(key);
+        btn.textContent = `${seasonLabel(key)} (${seasons.get(key).length})`;
+        btn.onclick = () => drawSeason(key);
+        strip.appendChild(btn);
+    });
+
+    filesEl.innerHTML = '';
+    filesEl.appendChild(strip);
+    filesEl.appendChild(panel);
+    drawSeason(active);
+}
+
 async function loadFilesForItem(item) {
     const filesEl = document.getElementById('modalFiles');
     filesEl.innerHTML = `<div class="modal-loading"><div class="spinner"></div>Searching files...</div>`;
     try {
-        const resp = await fetch(`/api/search?q=${encodeURIComponent(item.title)}&offset=0`);
-        const data = await resp.json();
-        botUsername = data.bot_username || botUsername;
-        if (!data.files || data.files.length === 0) {
+        const files = await fetchFilesForItem(item);
+        if (!files.length) {
             filesEl.innerHTML = `
                 <div class="modal-empty">
                     <div class="modal-empty-icon">📭</div>
                     <div class="modal-empty-title">No files found</div>
-                    <div class="modal-empty-sub">We don't have files for "<b>${item.title}</b>" yet. Request it in our group!</div>
+                    <div class="modal-empty-sub">We don't have files for "<b>${escapeHTML(item.title)}</b>" yet. Request it in our group!</div>
                 </div>`;
             return;
         }
-        filesEl.innerHTML = '';
-        data.files.forEach(file => {
-            const el = document.createElement('div');
-            el.className = 'file-item';
-            el.innerHTML = `
-                <div class="file-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                </div>
-                <div class="file-item-info">
-                    <div class="file-item-name">${file.name}</div>
-                    <div class="file-item-size">${file.size}</div>
-                </div>
-                <div class="file-item-get">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-                </div>
-            `;
-            el.onclick = () => getFile(file.id);
-            filesEl.appendChild(el);
-        });
+        if (item.type === 'tv') {
+            renderSeasonFiles(filesEl, files);
+        } else {
+            filesEl.innerHTML = '';
+            files.forEach(file => filesEl.appendChild(renderFileRow(file)));
+        }
     } catch(e) {
         filesEl.innerHTML = `<div class="modal-empty"><div class="modal-empty-icon">⚠️</div><div class="modal-empty-title">Error</div><div class="modal-empty-sub">Failed to load files.</div></div>`;
     }
