@@ -10,7 +10,6 @@ from database.ia_filterdb import get_search_results
 from database.users_chats_db import db
 import json, io, aiohttp
 import re
-from difflib import SequenceMatcher
 import PTN
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -28,38 +27,92 @@ def normalize_title(value):
     }
     return " ".join(part for part in value.split() if part not in noise)
 
-def file_model(file):
-    name = file.get("file_name", "Unknown")
-    parsed = PTN.parse(name)
-    title = parsed.get("title") or name
+def clean_filename_title(value):
+    value = re.sub(r"\.[^.]+$", "", str(value or ""))
+    value = re.sub(r"[\._\-\[\]\(\)]+", " ", value)
+    return " ".join(value.split())
+
+def split_trailing_year(title):
+    match = re.search(r"\b((?:19|20)\d{2})$", str(title or "").strip())
+    if not match:
+        return title, None
+    return title[:match.start()].strip(), int(match.group(1))
+
+def parse_media_filename(name):
+    raw_name = str(name or "")
+    searchable = re.sub(r"[\._\-\[\]\(\)]+", " ", raw_name)
+
+    season_episode = re.search(r"(?i)(?:^|\s)s(\d{1,2})\s*e(\d{1,4})(?:\s|$)", searchable)
+    if season_episode:
+        title, year = split_trailing_year(clean_filename_title(searchable[:season_episode.start()]))
+        return {
+            "title": title,
+            "year": year,
+            "season": int(season_episode.group(1)),
+            "episode": int(season_episode.group(2)),
+        }
+
+    episode_only = re.search(r"(?i)(?:^|\s)(?:ep|episode)\s*(\d{1,5})(?:\s|$)", searchable)
+    if episode_only:
+        title, year = split_trailing_year(clean_filename_title(searchable[:episode_only.start()]))
+        return {
+            "title": title,
+            "year": year,
+            "season": None,
+            "episode": int(episode_only.group(1)),
+        }
+
+    movie_year = re.search(r"(?:^|\s)((?:19|20)\d{2})(?:\s|$)", searchable)
+    if movie_year:
+        return {
+            "title": clean_filename_title(searchable[:movie_year.start()]),
+            "year": int(movie_year.group(1)),
+            "season": None,
+            "episode": None,
+        }
+
+    parsed = PTN.parse(raw_name)
+    title = parsed.get("title") or raw_name
     season = parsed.get("season")
     episode = parsed.get("episode")
     year = parsed.get("year")
+    return {
+        "title": title,
+        "year": int(year) if str(year).isdigit() else year,
+        "season": int(season) if str(season).isdigit() else season,
+        "episode": int(episode) if str(episode).isdigit() else episode,
+    }
+
+def file_model(file):
+    name = file.get("file_name", "Unknown")
+    parsed = parse_media_filename(name)
     return {
         "id": str(file["_id"]),
         "name": name,
         "size": get_size(file.get("file_size", 0)),
         "raw_size": file.get("file_size", 0),
-        "title": title,
-        "year": year,
-        "season": int(season) if str(season).isdigit() else season,
-        "episode": int(episode) if str(episode).isdigit() else episode,
+        "title": parsed.get("title") or name,
+        "year": parsed.get("year"),
+        "season": parsed.get("season"),
+        "episode": parsed.get("episode"),
     }
 
 def match_file_to_tmdb(file, title, year=None, media_type=None):
     model = file_model(file)
     target = normalize_title(title)
     parsed_title = normalize_title(model["title"])
-    file_name = normalize_title(model["name"])
     if not target:
         model["match_score"] = 0
         return model
 
-    title_score = SequenceMatcher(None, target, parsed_title).ratio()
-    name_score = SequenceMatcher(None, target, file_name).ratio()
-    contains_score = 1.0 if target in file_name or target in parsed_title else 0
-    score = max(title_score, name_score, contains_score)
+    if parsed_title != target:
+        model["match_score"] = 0
+        return model
 
+    score = 1.0
+    if media_type == "movie" and year and model.get("year") and str(model["year"]) != str(year):
+        model["match_score"] = 0
+        return model
     if year and model.get("year") and str(model["year"]) == str(year):
         score += 0.08
     if media_type == "tv" and model.get("season") is not None:
