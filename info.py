@@ -178,3 +178,13 @@ TMDB_API_KEY = environ.get("TMDB_API_KEY", "0da1b0909b6f81d9543daf54db258f5a")  
 if len(TMDB_API_KEY) == 0:
     logger.info('TMDB_API_KEY is missing')
     TMDB_API_KEY = None
+
+# Optional metadata providers. TMDB and MyAnimeList/Jikan work without these keys;
+# OMDB adds IMDb ratings/quotes when configured, and TVDB adds TVDB links/data.
+OMDB_API_KEY = environ.get("OMDB_API_KEY", "c7dcf7bc")
+if len(OMDB_API_KEY) == 0:
+    OMDB_API_KEY = None
+
+TVDB_API_KEY = environ.get("TVDB_API_KEY", "db91b28e-ea15-4343-afcb-7ac1a786d55c")
+if len(TVDB_API_KEY) == 0:
+    TVDB_API_KEY = None
