@@ -1,7 +1,7 @@
 import math
 import secrets
 import mimetypes
-from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, OMDB_API_KEY, TVDB_API_KEY
 from utils import temp, get_size, handle_next_back, get_plan_name
 from aiohttp import web
 from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
@@ -11,11 +11,18 @@ from database.users_chats_db import db
 import json, io, aiohttp
 import re
 import PTN
+import asyncio
+from difflib import SequenceMatcher
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 routes = web.RouteTableDef()
 
 TMDB_BASE = "https://api.themoviedb.org/3"
+TMDB_IMAGE = "https://image.tmdb.org/t/p"
+JIKAN_BASE = "https://api.jikan.moe/v4"
+OMDB_BASE = "https://www.omdbapi.com/"
+TVDB_BASE = "https://api4.thetvdb.com/v4"
+TVDB_TOKEN = None
 
 def normalize_title(value):
     value = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
@@ -26,6 +33,18 @@ def normalize_title(value):
         "hevc", "aac", "esub", "subs", "subtitle", "480p", "720p", "1080p", "2160p"
     }
     return " ".join(part for part in value.split() if part not in noise)
+
+def fuzzy_ratio(left, right):
+    left = normalize_title(left)
+    right = normalize_title(right)
+    if not left or not right:
+        return 0
+    if left == right:
+        return 1
+    left_tokens = set(left.split())
+    right_tokens = set(right.split())
+    token_overlap = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
+    return max(SequenceMatcher(None, left, right).ratio(), token_overlap)
 
 def clean_filename_title(value):
     value = re.sub(r"\.[^.]+$", "", str(value or ""))
@@ -105,11 +124,12 @@ def match_file_to_tmdb(file, title, year=None, media_type=None):
         model["match_score"] = 0
         return model
 
-    if parsed_title != target:
+    similarity = fuzzy_ratio(parsed_title, target)
+    if similarity < 0.72:
         model["match_score"] = 0
         return model
 
-    score = 1.0
+    score = similarity
     if media_type == "movie" and year and model.get("year") and str(model["year"]) != str(year):
         model["match_score"] = 0
         return model
@@ -122,6 +142,242 @@ def match_file_to_tmdb(file, title, year=None, media_type=None):
 
     model["match_score"] = round(score, 4)
     return model
+
+async def fetch_json(session, url, params=None, headers=None):
+    async with session.get(url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+        if resp.status >= 400:
+            return {}
+        return await resp.json(content_type=None)
+
+def tmdb_img(path, size="original"):
+    return f"{TMDB_IMAGE}/{size}{path}" if path else None
+
+def pick_tmdb_trailer(videos):
+    items = videos.get("results", []) if isinstance(videos, dict) else []
+    youtube = [v for v in items if v.get("site") == "YouTube" and v.get("key")]
+    preferred = next((v for v in youtube if v.get("type") == "Trailer" and v.get("official")), None)
+    preferred = preferred or next((v for v in youtube if v.get("type") == "Trailer"), None)
+    preferred = preferred or (youtube[0] if youtube else None)
+    if not preferred:
+        return None
+    return {
+        "site": "YouTube",
+        "key": preferred["key"],
+        "name": preferred.get("name") or "Trailer",
+        "embed": f"https://www.youtube.com/embed/{preferred['key']}?autoplay=0&rel=0",
+        "url": f"https://www.youtube.com/watch?v={preferred['key']}"
+    }
+
+def fmt_tmdb_item(r, media_type=None):
+    mt = media_type or r.get("media_type", "movie")
+    title = r.get("title") or r.get("name", "")
+    date = r.get("release_date") or r.get("first_air_date", "")
+    return {
+        "id": r["id"],
+        "source": "tmdb",
+        "title": title,
+        "year": date[:4] if date else "",
+        "type": mt,
+        "rating": round(r.get("vote_average", 0), 1),
+        "poster": tmdb_img(r.get("poster_path"), "w342"),
+        "backdrop": tmdb_img(r.get("backdrop_path"), "w1280"),
+        "overview": r.get("overview", ""),
+        "genres": r.get("genre_ids", [])
+    }
+
+def fmt_mal_item(item):
+    images = item.get("images", {}).get("jpg", {})
+    aired = item.get("aired", {}) or {}
+    year = item.get("year") or str(aired.get("from", ""))[:4]
+    return {
+        "id": item.get("mal_id"),
+        "source": "mal",
+        "title": item.get("title_english") or item.get("title") or "",
+        "year": str(year or ""),
+        "type": "anime",
+        "rating": round(item.get("score") or 0, 1),
+        "poster": images.get("large_image_url") or images.get("image_url"),
+        "backdrop": images.get("large_image_url") or images.get("image_url"),
+        "overview": item.get("synopsis") or "",
+        "genres": [g.get("name") for g in item.get("genres", []) if g.get("name")]
+    }
+
+def compact_people(items, role_key="character", limit=14):
+    people = []
+    for p in (items or [])[:limit]:
+        people.append({
+            "name": p.get("name") or "",
+            "role": p.get(role_key) or p.get("job") or "",
+            "image": tmdb_img(p.get("profile_path"), "w185")
+        })
+    return people
+
+async def get_tvdb_token(session):
+    global TVDB_TOKEN
+    if TVDB_TOKEN or not TVDB_API_KEY:
+        return TVDB_TOKEN
+    data = await fetch_json(session, f"{TVDB_BASE}/login", headers={"Content-Type": "application/json"}, params=None)
+    return data.get("data", {}).get("token")
+
+async def fetch_tvdb_data(session, title, year=None):
+    if not TVDB_API_KEY:
+        return None
+    global TVDB_TOKEN
+    if not TVDB_TOKEN:
+        async with session.post(f"{TVDB_BASE}/login", json={"apikey": TVDB_API_KEY}, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+            if resp.status >= 400:
+                return None
+            data = await resp.json(content_type=None)
+            TVDB_TOKEN = data.get("data", {}).get("token")
+    headers = {"Authorization": f"Bearer {TVDB_TOKEN}"}
+    data = await fetch_json(session, f"{TVDB_BASE}/search", params={"query": title, "type": "series"}, headers=headers)
+    first = next((x for x in data.get("data", []) if not year or str(year) in str(x.get("year", ""))), None)
+    if not first:
+        first = (data.get("data") or [None])[0]
+    if not first:
+        return None
+    return {
+        "id": first.get("tvdb_id"),
+        "url": f"https://thetvdb.com/dereferrer/series/{first.get('tvdb_id')}" if first.get("tvdb_id") else None,
+        "status": first.get("status"),
+        "network": first.get("network"),
+        "overview": first.get("overview"),
+        "poster": first.get("image_url")
+    }
+
+async def fetch_omdb_data(session, imdb_id):
+    if not OMDB_API_KEY or not imdb_id:
+        return None
+    data = await fetch_json(session, OMDB_BASE, params={"apikey": OMDB_API_KEY, "i": imdb_id, "plot": "full"})
+    if data.get("Response") == "False":
+        return None
+    return {
+        "imdb_id": imdb_id,
+        "rating": data.get("imdbRating"),
+        "votes": data.get("imdbVotes"),
+        "rated": data.get("Rated"),
+        "awards": data.get("Awards"),
+        "box_office": data.get("BoxOffice"),
+        "imdb_url": f"https://www.imdb.com/title/{imdb_id}/",
+        "quote": data.get("Awards") if data.get("Awards") and data.get("Awards") != "N/A" else None,
+        "poster": None if data.get("Poster") == "N/A" else data.get("Poster")
+    }
+
+async def build_tmdb_details(session, media_type, tmdb_id):
+    data = await fetch_json(
+        session,
+        f"{TMDB_BASE}/{media_type}/{tmdb_id}",
+        params={
+            "api_key": TMDB_API_KEY,
+            "append_to_response": "videos,credits,images,external_ids,reviews,keywords,watch/providers,content_ratings,release_dates"
+        }
+    )
+    if not data:
+        return {}
+    title = data.get("title") or data.get("name") or ""
+    date = data.get("release_date") or data.get("first_air_date") or ""
+    trailer = pick_tmdb_trailer(data.get("videos", {}))
+    imdb_id = data.get("external_ids", {}).get("imdb_id") or data.get("imdb_id")
+    omdb, tvdb = await asyncio.gather(
+        fetch_omdb_data(session, imdb_id),
+        fetch_tvdb_data(session, title, date[:4] if date else None)
+    )
+    backdrops = [tmdb_img(x.get("file_path"), "w1280") for x in data.get("images", {}).get("backdrops", [])[:12]]
+    posters = [tmdb_img(x.get("file_path"), "w500") for x in data.get("images", {}).get("posters", [])[:12]]
+    keywords_data = data.get("keywords", {})
+    keywords = keywords_data.get("keywords") or keywords_data.get("results") or []
+    providers = ((data.get("watch/providers", {}).get("results") or {}).get("US") or {})
+    return {
+        "id": data.get("id"),
+        "source": "tmdb",
+        "type": media_type,
+        "title": title,
+        "year": date[:4] if date else "",
+        "tagline": data.get("tagline") or "",
+        "overview": data.get("overview") or "",
+        "status": data.get("status"),
+        "runtime": data.get("runtime") or (data.get("episode_run_time") or [None])[0],
+        "rating": round(data.get("vote_average") or 0, 1),
+        "votes": data.get("vote_count") or 0,
+        "poster": tmdb_img(data.get("poster_path"), "w500") or (omdb or {}).get("poster"),
+        "backdrop": tmdb_img(data.get("backdrop_path"), "w1280"),
+        "trailer": trailer,
+        "genres": [g.get("name") for g in data.get("genres", [])],
+        "cast": compact_people(data.get("credits", {}).get("cast", [])),
+        "crew": compact_people(data.get("credits", {}).get("crew", []), role_key="job", limit=8),
+        "images": {"backdrops": [x for x in backdrops if x], "posters": [x for x in posters if x]},
+        "reviews": [{
+            "author": r.get("author"),
+            "quote": (r.get("content") or "")[:260]
+        } for r in data.get("reviews", {}).get("results", [])[:4]],
+        "keywords": [k.get("name") for k in keywords[:14] if k.get("name")],
+        "links": {
+            "tmdb": f"https://www.themoviedb.org/{media_type}/{tmdb_id}",
+            "imdb": f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else None,
+            "tvdb": (tvdb or {}).get("url")
+        },
+        "external": {"imdb": omdb, "tvdb": tvdb},
+        "providers": {
+            "link": providers.get("link"),
+            "flatrate": [p.get("provider_name") for p in providers.get("flatrate", [])[:8]],
+            "rent": [p.get("provider_name") for p in providers.get("rent", [])[:8]],
+            "buy": [p.get("provider_name") for p in providers.get("buy", [])[:8]]
+        }
+    }
+
+async def build_mal_details(session, mal_id):
+    data = await fetch_json(session, f"{JIKAN_BASE}/anime/{mal_id}/full")
+    anime = data.get("data") or {}
+    chars_data = await fetch_json(session, f"{JIKAN_BASE}/anime/{mal_id}/characters")
+    videos_data = await fetch_json(session, f"{JIKAN_BASE}/anime/{mal_id}/videos")
+    images = anime.get("images", {}).get("jpg", {})
+    trailer = anime.get("trailer", {}) or {}
+    promo = next((v for v in (videos_data.get("data", {}).get("promo") or []) if v.get("trailer", {}).get("embed_url")), None)
+    cast = []
+    for c in (chars_data.get("data") or [])[:14]:
+        character = c.get("character", {})
+        cast.append({
+            "name": character.get("name") or "",
+            "role": c.get("role") or "",
+            "image": (character.get("images", {}).get("jpg") or {}).get("image_url")
+        })
+    title = anime.get("title_english") or anime.get("title") or ""
+    return {
+        "id": anime.get("mal_id"),
+        "source": "mal",
+        "type": "anime",
+        "title": title,
+        "year": str(anime.get("year") or "") or str((anime.get("aired") or {}).get("from", ""))[:4],
+        "tagline": anime.get("title_japanese") or "",
+        "overview": anime.get("synopsis") or "",
+        "status": anime.get("status"),
+        "runtime": anime.get("duration"),
+        "rating": round(anime.get("score") or 0, 1),
+        "votes": anime.get("scored_by") or 0,
+        "poster": images.get("large_image_url") or images.get("image_url"),
+        "backdrop": images.get("large_image_url") or images.get("image_url"),
+        "trailer": {
+            "site": "YouTube",
+            "key": trailer.get("youtube_id"),
+            "name": "Trailer",
+            "embed": trailer.get("embed_url"),
+            "url": trailer.get("url")
+        } if trailer.get("embed_url") else ({
+            "site": "YouTube",
+            "name": promo.get("title") or "Trailer",
+            "embed": promo.get("trailer", {}).get("embed_url"),
+            "url": promo.get("trailer", {}).get("url")
+        } if promo else None),
+        "genres": [g.get("name") for g in anime.get("genres", [])],
+        "cast": cast,
+        "crew": [{"name": p.get("name"), "role": "Producer", "image": None} for p in anime.get("producers", [])[:8]],
+        "images": {"backdrops": [images.get("large_image_url") or images.get("image_url")], "posters": [images.get("large_image_url") or images.get("image_url")]},
+        "reviews": [],
+        "keywords": [x.get("name") for x in (anime.get("themes", []) + anime.get("demographics", [])) if x.get("name")],
+        "links": {"mal": anime.get("url")},
+        "external": {"myanimelist": {"rank": anime.get("rank"), "popularity": anime.get("popularity"), "members": anime.get("members")}},
+        "providers": {}
+    }
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
@@ -218,6 +474,11 @@ async def api_search_handler(request):
     for term in search_terms:
         for file in await get_search_results(term):
             found[file["_id"]] = file
+    if not found and len(compact_query) >= 4:
+        for file in await get_search_results(""):
+            model = file_model(file)
+            if fuzzy_ratio(model["title"], compact_query) >= 0.68:
+                found[file["_id"]] = file
 
     ranked_files = [
         model for model in (
@@ -255,35 +516,78 @@ async def tmdb_search_handler(request):
     if not query:
         return web.json_response({"results": []})
     try:
+        corrected_query = None
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{TMDB_BASE}/search/multi",
                 params={"api_key": TMDB_API_KEY, "query": query, "page": page, "include_adult": "true"}
             ) as resp:
                 data = await resp.json()
+            anime_data = await fetch_json(session, f"{JIKAN_BASE}/anime", params={"q": query, "limit": 8, "sfw": "false"})
+            if not data.get("results") and not anime_data.get("data"):
+                recent_files = await get_search_results("")
+                candidates = []
+                for file in recent_files:
+                    title = file_model(file).get("title")
+                    score = fuzzy_ratio(query, title)
+                    if title and score >= 0.55:
+                        candidates.append((score, title))
+                if candidates:
+                    corrected_query = sorted(candidates, key=lambda x: -x[0])[0][1]
+                    async with session.get(
+                        f"{TMDB_BASE}/search/multi",
+                        params={"api_key": TMDB_API_KEY, "query": corrected_query, "page": page, "include_adult": "true"}
+                    ) as resp:
+                        data = await resp.json()
+                    anime_data = await fetch_json(session, f"{JIKAN_BASE}/anime", params={"q": corrected_query, "limit": 8, "sfw": "false"})
         results = []
         for r in data.get("results", []):
             if r.get("media_type") not in ["movie", "tv"]:
                 continue
-            title = r.get("title") or r.get("name", "")
-            date = r.get("release_date") or r.get("first_air_date", "")
-            year = date[:4] if date else ""
-            poster = f"https://image.tmdb.org/t/p/w342{r['poster_path']}" if r.get("poster_path") else None
-            backdrop = f"https://image.tmdb.org/t/p/w1280{r['backdrop_path']}" if r.get("backdrop_path") else None
-            results.append({
-                "id": r["id"],
-                "title": title,
-                "year": year,
-                "type": r["media_type"],
-                "rating": round(r.get("vote_average", 0), 1),
-                "poster": poster,
-                "backdrop": backdrop,
-                "overview": r.get("overview", ""),
-                "genres": r.get("genre_ids", [])
-            })
-        return web.json_response({"results": results, "total_pages": data.get("total_pages", 1)})
+            results.append(fmt_tmdb_item(r))
+        tmdb_titles = {normalize_title(x["title"]) for x in results}
+        for anime in anime_data.get("data", []):
+            item = fmt_mal_item(anime)
+            if item["title"] and normalize_title(item["title"]) not in tmdb_titles:
+                results.append(item)
+        rank_query = corrected_query or query
+        for item in results:
+            item["match_score"] = round(fuzzy_ratio(rank_query, item.get("title")), 4)
+        results.sort(key=lambda item: (
+            -item.get("match_score", 0),
+            0 if normalize_title(rank_query) == normalize_title(item.get("title")) else 1,
+            -(item.get("rating") or 0)
+        ))
+        best = results[0] if results else None
+        return web.json_response({
+            "results": results,
+            "total_pages": data.get("total_pages", 1),
+            "corrected_query": corrected_query or (best.get("title") if best and best.get("match_score", 0) < 1 else None)
+        })
     except Exception as e:
         return web.json_response({"results": [], "error": str(e)}, status=500)
+
+
+@routes.get("/api/media-details")
+async def media_details_handler(request):
+    source = request.query.get("source", "tmdb").strip()
+    media_type = request.query.get("type", "movie").strip()
+    media_id = request.query.get("id", "").strip()
+    if not media_id:
+        return web.json_response({"error": "Missing id"}, status=400)
+    try:
+        async with aiohttp.ClientSession() as session:
+            if source == "mal" or media_type == "anime":
+                details = await build_mal_details(session, media_id)
+            else:
+                if media_type not in ["movie", "tv"]:
+                    media_type = "movie"
+                details = await build_tmdb_details(session, media_type, media_id)
+        if not details:
+            return web.json_response({"error": "No details found"}, status=404)
+        return web.json_response(details)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 
 @routes.get("/api/tmdb-trending")
@@ -302,29 +606,19 @@ async def tmdb_trending_handler(request):
             for url, params in urls:
                 async with session.get(url, params=params) as r:
                     responses.append(await r.json())
+            anime_data = await fetch_json(session, f"{JIKAN_BASE}/top/anime", params={"filter": "bypopularity", "limit": 20})
 
         def fmt(items, media_type=None):
             out = []
             for r in items[:20]:
-                mt = media_type or r.get("media_type", "movie")
-                title = r.get("title") or r.get("name", "")
-                date = r.get("release_date") or r.get("first_air_date", "")
-                year = date[:4] if date else ""
-                poster = f"https://image.tmdb.org/t/p/w342{r['poster_path']}" if r.get("poster_path") else None
-                backdrop = f"https://image.tmdb.org/t/p/w1280{r['backdrop_path']}" if r.get("backdrop_path") else None
-                out.append({
-                    "id": r["id"], "title": title, "year": year, "type": mt,
-                    "rating": round(r.get("vote_average", 0), 1),
-                    "poster": poster, "backdrop": backdrop,
-                    "overview": r.get("overview", ""),
-                    "genres": r.get("genre_ids", [])
-                })
+                out.append(fmt_tmdb_item(r, media_type))
             return out
 
         trending_all = fmt(responses[0].get("results", []))
         popular_movies = fmt(responses[1].get("results", []), "movie")
         popular_tv = fmt(responses[2].get("results", []), "tv")
         top_rated = fmt(responses[3].get("results", []), "movie")
+        popular_anime = [fmt_mal_item(x) for x in anime_data.get("data", [])]
 
         hero = next((x for x in trending_all if x["backdrop"]), trending_all[0] if trending_all else None)
 
@@ -333,6 +627,7 @@ async def tmdb_trending_handler(request):
             "trending": trending_all,
             "popular_movies": popular_movies,
             "popular_tv": popular_tv,
+            "popular_anime": popular_anime,
             "top_rated": top_rated,
             "bot_username": temp.U_NAME
         })
