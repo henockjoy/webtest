@@ -49,8 +49,8 @@ webapp_template = """
         /* ── NAVBAR ── */
         .navbar {
             position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: env(safe-area-inset-top, 0px) 20px 0; height: calc(60px + env(safe-area-inset-top, 0px));
+            display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px;
+            padding: env(safe-area-inset-top, 0px) 14px 0; height: calc(64px + env(safe-area-inset-top, 0px));
             background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%);
             transition: background 0.3s;
         }
@@ -62,6 +62,18 @@ webapp_template = """
             white-space: nowrap;
         }
         .nav-right { display: flex; align-items: center; gap: 6px; }
+        .nav-search-pill {
+            min-width: 0; width: 100%; height: 40px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.08);
+            color: var(--text2); display: flex; align-items: center; gap: 10px;
+            padding: 0 12px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .nav-search-pill:hover { background: var(--card2); border-color: rgba(229,9,20,0.35); color: #fff; }
+        .nav-search-pill svg { flex: 0 0 auto; color: var(--text3); }
+        .nav-search-pill span {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
         .nav-search-toggle {
             background: none; border: none; color: var(--text2); cursor: pointer;
             width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
@@ -83,13 +95,13 @@ webapp_template = """
         .search-top-bar {
             display: flex; align-items: center; gap: 10px;
             /* Use safe-area fallback; in Telegram add extra top space */
-            padding: calc(52px + env(safe-area-inset-top, 0px)) 16px 12px;
+            padding: calc(58px + env(safe-area-inset-top, 0px)) 16px 12px;
             flex-shrink: 0;
         }
         .search-field-wrap {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 12px;
             background: var(--card2); border-radius: var(--radius);
-            border: 1px solid var(--border); padding: 0 14px;
+            border: 1px solid var(--border); padding: 0 16px;
             flex: 1; min-width: 0;
             transition: border-color 0.25s, box-shadow 0.25s;
         }
@@ -100,8 +112,8 @@ webapp_template = """
         .search-field-wrap svg { color: var(--text3); flex-shrink: 0; }
         .search-field {
             flex: 1; background: none; border: none; outline: none;
-            color: #fff; font-family: 'Outfit', sans-serif; font-size: 16px;
-            padding: 14px 0; min-width: 0;
+            color: #fff; font-family: 'Outfit', sans-serif; font-size: 18px;
+            padding: 17px 0; min-width: 0;
         }
         .search-field::placeholder { color: var(--text3); }
         .search-close {
@@ -112,6 +124,12 @@ webapp_template = """
         }
         .search-close:hover { opacity: 0.8; }
         .search-close:active { transform: scale(0.96); }
+        .search-suggestion {
+            grid-column: 1 / -1; color: var(--text2); font-size: 13px;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 10px 12px; line-height: 1.4;
+        }
+        .search-suggestion b { color: #fff; }
 
         /* Search meta bar */
         .search-meta-bar {
@@ -344,7 +362,7 @@ webapp_template = """
         .modal-backdrop.open { opacity: 1; visibility: visible; }
         .modal-sheet {
             background: var(--card); border-radius: 20px 20px 0 0;
-            width: 100%; max-width: 600px; max-height: 85vh;
+            width: 100%; max-width: 780px; max-height: 92vh;
             display: flex; flex-direction: column;
             transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
             overflow: hidden;
@@ -358,6 +376,85 @@ webapp_template = """
             display: flex; align-items: flex-start; gap: 14px;
             padding: 16px 20px; flex-shrink: 0;
         }
+        .detail-scroll {
+            overflow-y: auto; flex: 1; padding-bottom: 96px;
+        }
+        .detail-media {
+            position: relative; width: 100%; aspect-ratio: 16 / 9;
+            background: #050508; overflow: hidden; border-bottom: 1px solid var(--border);
+        }
+        .detail-media iframe,
+        .detail-media img {
+            position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+            object-fit: cover;
+        }
+        .detail-media::after {
+            content: ''; position: absolute; inset: auto 0 0; height: 35%;
+            background: linear-gradient(to top, rgba(22,22,31,0.9), transparent);
+            pointer-events: none;
+        }
+        .detail-source-row {
+            display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px 0;
+        }
+        .source-chip {
+            color: var(--text2); border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.7px;
+            padding: 5px 8px; border-radius: 6px; text-decoration: none;
+        }
+        .detail-section { padding: 16px 20px 0; }
+        .detail-section-title {
+            font-size: 12px; color: var(--text3); text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 800; margin-bottom: 10px;
+        }
+        .detail-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+        }
+        .detail-stat {
+            background: rgba(255,255,255,0.035); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 10px;
+        }
+        .detail-stat-label { color: var(--text3); font-size: 10px; text-transform: uppercase; font-weight: 800; margin-bottom: 4px; }
+        .detail-stat-value { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.35; }
+        .detail-strip {
+            display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;
+            scrollbar-width: none;
+        }
+        .detail-strip::-webkit-scrollbar { display: none; }
+        .person-card { width: 92px; flex: 0 0 auto; }
+        .person-photo {
+            width: 92px; height: 118px; border-radius: var(--radius-sm);
+            object-fit: cover; background: var(--card2); border: 1px solid var(--border);
+        }
+        .person-name { font-size: 11px; font-weight: 700; margin-top: 6px; color: #fff; line-height: 1.25; }
+        .person-role { font-size: 10px; color: var(--text3); line-height: 1.25; margin-top: 2px; }
+        .image-thumb {
+            width: 180px; height: 102px; flex: 0 0 auto; border-radius: var(--radius-sm);
+            object-fit: cover; background: var(--card2); border: 1px solid var(--border);
+        }
+        .quote-card {
+            border-left: 3px solid var(--accent); background: rgba(255,255,255,0.035);
+            padding: 12px; border-radius: var(--radius-sm); color: var(--text2);
+            font-size: 12px; line-height: 1.55; margin-bottom: 8px;
+        }
+        .file-action-bar {
+            position: sticky; bottom: 0; z-index: 4; background: rgba(22,22,31,0.96);
+            border-top: 1px solid var(--border); backdrop-filter: blur(18px);
+            padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+            display: none; gap: 10px; align-items: center;
+        }
+        .file-action-bar.show { display: flex; }
+        .selected-file-name {
+            flex: 1; min-width: 0; font-size: 11px; color: var(--text2); line-height: 1.35;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .action-pill {
+            border: 0; border-radius: var(--radius-sm); color: #fff; font-family: 'Outfit', sans-serif;
+            font-size: 12px; font-weight: 800; padding: 11px 13px; cursor: pointer;
+            text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            white-space: nowrap;
+        }
+        .watch-pill { background: var(--accent); }
+        .download-pill { background: var(--card2); border: 1px solid var(--border); }
         .modal-poster {
             width: 64px; height: 95px; border-radius: var(--radius-sm);
             object-fit: cover; flex-shrink: 0; background: var(--card2);
@@ -408,6 +505,7 @@ webapp_template = """
         .file-item:last-child { border-bottom: none; }
         .file-item:hover { background: var(--card2); transform: translateX(2px); }
         .file-item:active { background: rgba(229,9,20,0.1); transform: scale(0.99); }
+        .file-item.selected { background: rgba(229,9,20,0.14); border-color: rgba(229,9,20,0.38); }
         
         /* Genre pills in modal */
         .modal-genres {
@@ -597,6 +695,10 @@ webapp_template = """
 <!-- NAVBAR -->
 <nav class="navbar" id="navbar">
     <div class="nav-logo">Filmotainment</div>
+    <button class="nav-search-pill" onclick="openSearch()" title="Search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Search movies, series, anime</span>
+    </button>
     <div class="nav-right">
         <button class="nav-search-toggle" id="searchToggle" onclick="openSearch()" title="Search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -610,14 +712,14 @@ webapp_template = """
     <div class="search-top-bar">
         <div class="search-field-wrap">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="search-field" id="searchField" type="text" placeholder="Movies, TV shows..." autocomplete="off">
+            <input class="search-field" id="searchField" type="text" placeholder="Search movies, series, anime..." autocomplete="off">
         </div>
         <button class="search-close" onclick="closeSearch()">Cancel</button>
     </div>
     <div class="search-results-grid" id="searchResultsGrid">
         <div class="search-hint" style="grid-column:1/-1">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Search for movies and TV shows
+            Search for movies, TV shows and anime
         </div>
     </div>
 </div>
@@ -692,6 +794,18 @@ webapp_template = """
         </div>
     </section>
 
+    <!-- Popular Anime Row -->
+    <section class="row-section fade-up" style="animation-delay:0.32s">
+        <div class="row-header">
+            <div class="row-title"><span></span>Popular Anime</div>
+        </div>
+        <div class="poster-scroll" id="rowAnime">
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div>
+        </div>
+    </section>
+
 </main>
 
 <!-- PREMIUM FOOTER -->
@@ -713,6 +827,8 @@ webapp_template = """
 <div class="modal-backdrop" id="modalBackdrop" onclick="handleBackdropClick(event)">
     <div class="modal-sheet" id="modalSheet">
         <div class="modal-handle"></div>
+        <div class="detail-scroll" id="detailScroll">
+        <div class="detail-media" id="detailMedia"></div>
         <div class="modal-header" id="modalHeader">
             <div class="modal-poster-placeholder" id="modalPosterWrap">🎬</div>
             <div class="modal-info" id="modalInfo"></div>
@@ -720,9 +836,20 @@ webapp_template = """
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
+        <div class="detail-source-row" id="detailSources"></div>
+        <div class="detail-section" id="detailStats"></div>
+        <div class="detail-section" id="detailCast"></div>
+        <div class="detail-section" id="detailImages"></div>
+        <div class="detail-section" id="detailQuotes"></div>
         <div class="modal-divider"></div>
         <div class="modal-files-label">Available Files</div>
         <div class="modal-files" id="modalFiles"></div>
+        </div>
+        <div class="file-action-bar" id="fileActionBar">
+            <div class="selected-file-name" id="selectedFileName"></div>
+            <a class="action-pill watch-pill" id="watchAction" target="_blank" rel="noopener">Watch</a>
+            <button class="action-pill download-pill" id="downloadAction" type="button">Download</button>
+        </div>
     </div>
 </div>
 
@@ -800,7 +927,7 @@ function setHero(item) {
         ${item.rating > 0 ? `<span class="rating">⭐ ${item.rating}</span><span class="dot"></span>` : ''}
         <span>${item.year || ''}</span>
         ${item.year ? '<span class="dot"></span>' : ''}
-        <span style="text-transform:capitalize">${item.type === 'tv' ? 'TV Show' : 'Movie'}</span>
+        <span style="text-transform:capitalize">${typeLabel(item.type)}</span>
     `;
     btn.onclick = () => openModal(item);
 }
@@ -837,7 +964,7 @@ function renderRow(containerId, items) {
             <div class="poster-img-wrap">
                 ${posterHTML}
                 ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+                <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie')}</div>
             </div>
             <div class="poster-title">${item.title}</div>
             ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
@@ -886,6 +1013,7 @@ async function loadHome() {
         if (data.popular_movies) { renderRow('rowMovies', data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); }
         if (data.popular_tv) { renderRow('rowTV', data.popular_tv); enableDragScroll(document.getElementById('rowTV')); }
         if (data.top_rated) { renderRow('rowTopRated', data.top_rated); enableDragScroll(document.getElementById('rowTopRated')); }
+        if (data.popular_anime) { renderRow('rowAnime', data.popular_anime); enableDragScroll(document.getElementById('rowAnime')); }
 
     } catch(e) {
         console.error('Failed to load home:', e);
@@ -907,7 +1035,7 @@ function closeSearch() {
     document.getElementById('searchResultsGrid').innerHTML = `
         <div class="search-hint" style="grid-column:1/-1">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Search for movies and TV shows
+            Search for movies, TV shows and anime
         </div>`;
 }
 
@@ -943,11 +1071,17 @@ async function doSearch(q) {
             grid.innerHTML = `<div class="search-hint" style="grid-column:1/-1">No results found for "<b>${q}</b>"</div>`;
             return;
         }
+        if (data.corrected_query && data.corrected_query.toLowerCase() !== q.toLowerCase()) {
+            const suggestion = document.createElement('div');
+            suggestion.className = 'search-suggestion';
+            suggestion.innerHTML = `Showing best matches for <b>${escapeHTML(data.corrected_query)}</b>`;
+            grid.appendChild(suggestion);
+        }
         // Results count bar
         const bar = document.createElement('div');
         bar.className = 'search-meta-bar';
         bar.style.gridColumn = '1 / -1';
-        bar.innerHTML = `Found <b>${data.results.length}</b> results for "<b>${q}</b>"`;
+        bar.innerHTML = `Found <b>${data.results.length}</b> results for "<b>${escapeHTML(q)}</b>"`;
         grid.appendChild(bar);
         // Render premium cards using the same poster-card structure
         data.results.forEach((item, idx) => {
@@ -961,7 +1095,7 @@ async function doSearch(q) {
                 <div class="poster-img-wrap">
                     ${posterHTML}
                     ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                    <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+                    <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie')}</div>
                 </div>
                 <div class="poster-title">${item.title}</div>
                 ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
@@ -976,9 +1110,17 @@ async function doSearch(q) {
 
 // ── MODAL ─────────────────────────────────────────────────────────────────
 let currentItem = null;
+let selectedFile = null;
 
 async function openModal(item) {
     currentItem = item;
+    selectedFile = null;
+    hideFileActions();
+    resetDetailSections();
+    document.getElementById('detailMedia').innerHTML = item.backdrop
+        ? `<img src="${item.backdrop}" alt="${escapeHTML(item.title)} backdrop">`
+        : `<div class="modal-loading">Loading details...</div>`;
+    document.getElementById('detailScroll').scrollTop = 0;
     // Populate header
     const posterWrap = document.getElementById('modalPosterWrap');
     const info = document.getElementById('modalInfo');
@@ -999,7 +1141,7 @@ async function openModal(item) {
     };
     let genrePills = '';
     if (item.genres && item.genres.length > 0) {
-        genrePills = `<div class="modal-genres">` + item.genres.slice(0, 3).map(id => `<span class="genre-pill">${genreMap[id] || 'Media'}</span>`).join('') + `</div>`;
+        genrePills = `<div class="modal-genres">` + item.genres.slice(0, 3).map(id => `<span class="genre-pill">${genreMap[id] || id || 'Media'}</span>`).join('') + `</div>`;
     }
     
     info.innerHTML = `
@@ -1007,7 +1149,7 @@ async function openModal(item) {
         <div class="modal-meta">
             ${item.rating > 0 ? `<span class="rating">⭐ ${item.rating}</span>` : ''}
             ${item.year ? `<span>${item.year}</span>` : ''}
-            <span style="text-transform:capitalize">${item.type === 'tv' ? 'TV Show' : 'Movie'}</span>
+            <span style="text-transform:capitalize">${typeLabel(item.type)}</span>
         </div>
         ${genrePills}
         ${item.overview ? `<div class="modal-overview">${item.overview}</div>` : ''}
@@ -1015,14 +1157,15 @@ async function openModal(item) {
     // Show modal
     document.getElementById('modalBackdrop').classList.add('open');
     document.body.style.overflow = 'hidden';
-    // Load files
-    await loadFilesForItem(item);
+    await Promise.all([loadDetailsForItem(item), loadFilesForItem(item)]);
 }
 
 function closeModal() {
     document.getElementById('modalBackdrop').classList.remove('open');
     document.body.style.overflow = '';
     currentItem = null;
+    selectedFile = null;
+    hideFileActions();
 }
 
 function handleBackdropClick(e) {
@@ -1033,6 +1176,122 @@ function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[ch]));
+}
+
+function typeLabel(type) {
+    if (type === 'tv') return 'TV Show';
+    if (type === 'anime') return 'Anime';
+    return 'Movie';
+}
+
+function resetDetailSections() {
+    ['detailSources', 'detailStats', 'detailCast', 'detailImages', 'detailQuotes'].forEach(id => {
+        document.getElementById(id).innerHTML = '';
+    });
+}
+
+function renderDetailMedia(details) {
+    const media = document.getElementById('detailMedia');
+    if (details.trailer && details.trailer.embed) {
+        media.innerHTML = `<iframe src="${details.trailer.embed}" title="${escapeHTML(details.title)} trailer" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+    } else if (details.backdrop || details.poster) {
+        media.innerHTML = `<img src="${details.backdrop || details.poster}" alt="${escapeHTML(details.title)} image">`;
+    } else {
+        media.innerHTML = `<div class="modal-loading">No trailer or backdrop available.</div>`;
+    }
+}
+
+function renderSources(details) {
+    const links = details.links || {};
+    const chips = [];
+    if (links.imdb) chips.push(`<a class="source-chip" href="${links.imdb}" target="_blank" rel="noopener">IMDb</a>`);
+    if (links.tvdb) chips.push(`<a class="source-chip" href="${links.tvdb}" target="_blank" rel="noopener">TVDB</a>`);
+    if (links.mal) chips.push(`<a class="source-chip" href="${links.mal}" target="_blank" rel="noopener">MyAnimeList</a>`);
+    if (links.tmdb) chips.push(`<a class="source-chip" href="${links.tmdb}" target="_blank" rel="noopener">TMDB</a>`);
+    document.getElementById('detailSources').innerHTML = chips.join('');
+}
+
+function renderStats(details) {
+    const imdb = details.external?.imdb || {};
+    const tvdb = details.external?.tvdb || {};
+    const mal = details.external?.myanimelist || {};
+    const values = [
+        ['Rating', details.rating ? `${details.rating}/10${details.votes ? ` (${details.votes} votes)` : ''}` : 'Not rated'],
+        ['IMDb', imdb.rating ? `${imdb.rating}/10${imdb.votes ? ` (${imdb.votes})` : ''}` : 'Not available'],
+        ['Status', details.status || tvdb.status || 'Unknown'],
+        ['Runtime', details.runtime || 'Unknown'],
+        ['Quote', imdb.quote || details.tagline || 'None listed'],
+        ['Rank', mal.rank ? `#${mal.rank}` : (mal.popularity ? `Popularity #${mal.popularity}` : 'Not listed')]
+    ];
+    document.getElementById('detailStats').innerHTML = `
+        <div class="detail-section-title">Details</div>
+        <div class="detail-grid">
+            ${values.map(([label, value]) => `<div class="detail-stat"><div class="detail-stat-label">${label}</div><div class="detail-stat-value">${escapeHTML(value)}</div></div>`).join('')}
+        </div>
+        ${details.keywords?.length ? `<div class="modal-genres" style="margin-top:12px">${details.keywords.map(x => `<span class="genre-pill">${escapeHTML(x)}</span>`).join('')}</div>` : ''}
+    `;
+}
+
+function renderPeople(details) {
+    if (!details.cast?.length) return;
+    document.getElementById('detailCast').innerHTML = `
+        <div class="detail-section-title">Cast</div>
+        <div class="detail-strip">
+            ${details.cast.map(p => `
+                <div class="person-card">
+                    ${p.image ? `<img class="person-photo" src="${p.image}" alt="${escapeHTML(p.name)}">` : `<div class="person-photo poster-placeholder">?</div>`}
+                    <div class="person-name">${escapeHTML(p.name)}</div>
+                    <div class="person-role">${escapeHTML(p.role)}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderImages(details) {
+    const images = [...(details.images?.backdrops || []), ...(details.images?.posters || [])].filter(Boolean).slice(0, 16);
+    if (!images.length) return;
+    document.getElementById('detailImages').innerHTML = `
+        <div class="detail-section-title">Images</div>
+        <div class="detail-strip">
+            ${images.map(src => `<img class="image-thumb" src="${src}" alt="${escapeHTML(details.title)} image" loading="lazy">`).join('')}
+        </div>
+    `;
+}
+
+function renderQuotes(details) {
+    const quotes = [];
+    if (details.tagline) quotes.push({author: details.title, quote: details.tagline});
+    if (details.external?.imdb?.quote) quotes.push({author: 'IMDb', quote: details.external.imdb.quote});
+    (details.reviews || []).forEach(r => { if (r.quote) quotes.push(r); });
+    if (!quotes.length) return;
+    document.getElementById('detailQuotes').innerHTML = `
+        <div class="detail-section-title">Quotes & Reviews</div>
+        ${quotes.slice(0, 5).map(q => `<div class="quote-card">"${escapeHTML(q.quote)}"<br><b>${escapeHTML(q.author || 'Viewer')}</b></div>`).join('')}
+    `;
+}
+
+async function loadDetailsForItem(item) {
+    try {
+        const params = new URLSearchParams({
+            source: item.source || 'tmdb',
+            type: item.type || 'movie',
+            id: item.id
+        });
+        const resp = await fetch(`/api/media-details?${params.toString()}`);
+        const details = await resp.json();
+        if (!resp.ok) throw new Error(details.error || 'Details failed');
+        currentItem = {...item, ...details};
+        renderDetailMedia(currentItem);
+        renderSources(currentItem);
+        renderStats(currentItem);
+        renderPeople(currentItem);
+        renderImages(currentItem);
+        renderQuotes(currentItem);
+    } catch(e) {
+        renderDetailMedia(item);
+        document.getElementById('detailStats').innerHTML = `<div class="modal-empty-sub" style="padding:0 0 10px">Extra details could not be loaded. Showing available info.</div>`;
+    }
 }
 
 function episodeLabel(file) {
@@ -1064,7 +1323,7 @@ function renderFileRow(file, compact=false) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
         </div>
     `;
-    el.onclick = () => getFile(file.id);
+    el.onclick = () => selectFile(file, el);
     return el;
 }
 
@@ -1160,6 +1419,23 @@ async function loadFilesForItem(item) {
     } catch(e) {
         filesEl.innerHTML = `<div class="modal-empty"><div class="modal-empty-icon">⚠️</div><div class="modal-empty-title">Error</div><div class="modal-empty-sub">Failed to load files.</div></div>`;
     }
+}
+
+function selectFile(file, el) {
+    selectedFile = file;
+    document.querySelectorAll('.file-item.selected').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('selectedFileName').textContent = `${file.name} (${file.size})`;
+    document.getElementById('watchAction').href = `/watch/${file.id}`;
+    document.getElementById('downloadAction').onclick = () => getFile(file.id);
+    document.getElementById('fileActionBar').classList.add('show');
+    showToast('File selected');
+}
+
+function hideFileActions() {
+    document.getElementById('fileActionBar').classList.remove('show');
+    document.getElementById('selectedFileName').textContent = '';
+    document.getElementById('watchAction').removeAttribute('href');
 }
 
 function getFile(fileId) {
