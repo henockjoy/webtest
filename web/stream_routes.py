@@ -1,7 +1,7 @@
 import math
 import secrets
 import mimetypes
-from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, QUALITY, LANGUAGES
 from utils import temp, get_size, handle_next_back, get_plan_name
 from aiohttp import web
 from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
@@ -11,11 +11,20 @@ from database.users_chats_db import db
 import json, io, aiohttp
 import re
 import PTN
+from datetime import datetime, timezone
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 routes = web.RouteTableDef()
 
 TMDB_BASE = "https://api.themoviedb.org/3"
+JIKAN_BASE = "https://api.jikan.moe/v4"
+
+LANGUAGE_LABELS = {language.lower(): language.title() for language in LANGUAGES}
+LANGUAGE_LABELS.update({
+    "hin": "Hindi", "eng": "English", "tam": "Tamil", "tel": "Telugu",
+    "mal": "Malayalam", "kan": "Kannada", "jpn": "Japanese", "japanese": "Japanese",
+    "multi": "Multi", "dual": "Dual Audio", "dual audio": "Dual Audio"
+})
 
 def normalize_title(value):
     value = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
@@ -37,6 +46,62 @@ def split_trailing_year(title):
     if not match:
         return title, None
     return title[:match.start()].strip(), int(match.group(1))
+
+def detect_quality(*values):
+    haystack = " ".join(str(value or "") for value in values).lower()
+    for quality in sorted(QUALITY, key=len, reverse=True):
+        if re.search(rf"(?<!\d){re.escape(quality.lower())}(?!\d)", haystack):
+            return quality.lower()
+    if re.search(r"\b4k\b|\buhd\b", haystack):
+        return "2160p"
+    return "Unknown"
+
+def detect_language(*values):
+    haystack = " ".join(str(value or "") for value in values).lower()
+    found = []
+    for key, label in LANGUAGE_LABELS.items():
+        if re.search(rf"\b{re.escape(key)}\b", haystack) and label not in found:
+            found.append(label)
+    return ", ".join(found[:3]) if found else "Unknown"
+
+def format_runtime(minutes):
+    try:
+        total = int(minutes or 0)
+    except (TypeError, ValueError):
+        return ""
+    if total <= 0:
+        return ""
+    hours, mins = divmod(total, 60)
+    if hours and mins:
+        return f"{hours}hr {mins}min"
+    if hours:
+        return f"{hours}hr"
+    return f"{mins}min"
+
+def format_date(value, with_time=False):
+    if not value:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            dt = datetime.strptime(str(value)[:10], "%Y-%m-%d")
+        except ValueError:
+            return str(value)
+    if with_time and (dt.hour or dt.minute):
+        return dt.strftime("%d %b, %I:%M %p").replace(" 0", " ")
+    return dt.strftime("%d %b").replace(" 0", " ")
+
+def unique_media(items):
+    seen = set()
+    output = []
+    for item in items:
+        key = (item.get("source", "tmdb"), item.get("type"), item.get("id"), item.get("title"))
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(item)
+    return output
 
 def parse_media_filename(name):
     raw_name = str(name or "")
@@ -85,16 +150,20 @@ def parse_media_filename(name):
 
 def file_model(file):
     name = file.get("file_name", "Unknown")
+    caption = file.get("caption", "")
     parsed = parse_media_filename(name)
     return {
         "id": str(file["_id"]),
         "name": name,
+        "caption": caption,
         "size": get_size(file.get("file_size", 0)),
         "raw_size": file.get("file_size", 0),
         "title": parsed.get("title") or name,
         "year": parsed.get("year"),
         "season": parsed.get("season"),
         "episode": parsed.get("episode"),
+        "quality": detect_quality(name, caption),
+        "language": detect_language(name, caption),
     }
 
 def match_file_to_tmdb(file, title, year=None, media_type=None):
@@ -286,6 +355,142 @@ async def tmdb_search_handler(request):
         return web.json_response({"results": [], "error": str(e)}, status=500)
 
 
+def tmdb_image(path, size="w342"):
+    return f"https://image.tmdb.org/t/p/{size}{path}" if path else None
+
+def tmdb_item(r, media_type=None, source="TMDB"):
+    mt = media_type or r.get("media_type", "movie")
+    title = r.get("title") or r.get("name", "")
+    date = r.get("release_date") or r.get("first_air_date", "")
+    return {
+        "id": r["id"],
+        "title": title,
+        "year": date[:4] if date else "",
+        "type": mt,
+        "source": source,
+        "rating": round(r.get("vote_average", 0), 1),
+        "poster": tmdb_image(r.get("poster_path"), "w342"),
+        "backdrop": tmdb_image(r.get("backdrop_path"), "w1280"),
+        "overview": r.get("overview", ""),
+        "genres": r.get("genre_ids", [])
+    }
+
+def jikan_item(r):
+    images = r.get("images", {}).get("jpg", {})
+    aired = r.get("aired", {}).get("from", "") or ""
+    return {
+        "id": r.get("mal_id"),
+        "title": r.get("title_english") or r.get("title") or "",
+        "year": aired[:4] if aired else "",
+        "type": "anime",
+        "source": "MyAnimeList",
+        "rating": round(r.get("score") or 0, 1),
+        "poster": images.get("large_image_url") or images.get("image_url"),
+        "backdrop": images.get("large_image_url") or images.get("image_url"),
+        "overview": r.get("synopsis", ""),
+        "genres": []
+    }
+
+def provider_name(providers):
+    for region in ("IN", "US"):
+        region_data = providers.get("results", {}).get(region, {})
+        for key in ("flatrate", "rent", "buy"):
+            if region_data.get(key):
+                return region_data[key][0].get("provider_name", "")
+    return ""
+
+def movie_ott_label(details):
+    platform = provider_name(details.get("watch/providers", {}))
+    release_date = ""
+    for country in details.get("release_dates", {}).get("results", []):
+        if country.get("iso_3166_1") not in ("IN", "US"):
+            continue
+        for release in country.get("release_dates", []):
+            if release.get("type") in (4, 6, 3):
+                release_date = format_date(release.get("release_date"))
+                break
+        if release_date:
+            break
+    if release_date and platform:
+        return f"{release_date} ({platform})"
+    return release_date or (f"Available ({platform})" if platform else details.get("status", ""))
+
+def pick_trailer(videos):
+    for video in videos.get("results", []):
+        if video.get("site") == "YouTube" and video.get("type") in ("Trailer", "Teaser"):
+            return video.get("key")
+    return ""
+
+def fmt_episode(episode):
+    if not episode:
+        return None
+    return {
+        "name": episode.get("name") or "Upcoming episode",
+        "season": episode.get("season_number"),
+        "episode": episode.get("episode_number"),
+        "air_date": format_date(episode.get("air_date")),
+        "runtime": format_runtime(episode.get("runtime")),
+        "overview": episode.get("overview", ""),
+        "still": tmdb_image(episode.get("still_path"), "w300"),
+    }
+
+def detail_episode_label(episode):
+    if not episode:
+        return "New episode"
+    season = episode.get("season")
+    ep = episode.get("episode")
+    if season is not None and ep is not None:
+        return f"S{season}|E{ep}"
+    if ep is not None:
+        return f"E{ep}"
+    return "New episode"
+
+@routes.get("/api/media-details")
+async def media_details_handler(request):
+    if not TMDB_API_KEY:
+        return web.json_response({"error": "TMDB API key not configured"}, status=503)
+    media_id = request.query.get("id", "").strip()
+    media_type = request.query.get("type", "movie").strip()
+    if media_type == "anime":
+        media_type = "tv"
+    if media_type not in ("movie", "tv") or not media_id:
+        return web.json_response({"error": "Invalid media"}, status=400)
+    append = "videos,watch/providers,external_ids"
+    append += ",release_dates" if media_type == "movie" else ",content_ratings"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{TMDB_BASE}/{media_type}/{media_id}",
+                params={"api_key": TMDB_API_KEY, "append_to_response": append}
+            ) as resp:
+                details = await resp.json()
+        if details.get("success") is False:
+            return web.json_response({"error": details.get("status_message", "Not found")}, status=404)
+        payload = {
+            "id": details.get("id"),
+            "title": details.get("title") or details.get("name"),
+            "type": media_type,
+            "year": (details.get("release_date") or details.get("first_air_date") or "")[:4],
+            "rating": round(details.get("vote_average") or 0, 1),
+            "runtime": format_runtime(details.get("runtime") or (details.get("episode_run_time") or [0])[0]),
+            "genres": [genre.get("name") for genre in details.get("genres", [])],
+            "overview": details.get("overview", ""),
+            "tagline": details.get("tagline", ""),
+            "status": details.get("status", ""),
+            "ott_status": movie_ott_label(details) if media_type == "movie" else "",
+            "first_air_date": format_date(details.get("first_air_date")),
+            "next_episode": fmt_episode(details.get("next_episode_to_air")),
+            "last_episode": fmt_episode(details.get("last_episode_to_air")),
+            "seasons": details.get("number_of_seasons"),
+            "episodes": details.get("number_of_episodes"),
+            "trailer_key": pick_trailer(details.get("videos", {})),
+            "external_ids": details.get("external_ids", {}),
+            "providers": provider_name(details.get("watch/providers", {})),
+        }
+        return web.json_response(payload)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 @routes.get("/api/tmdb-trending")
 async def tmdb_trending_handler(request):
     if not TMDB_API_KEY:
@@ -297,47 +502,88 @@ async def tmdb_trending_handler(request):
                 (f"{TMDB_BASE}/movie/popular", {"api_key": TMDB_API_KEY, "page": "1"}),
                 (f"{TMDB_BASE}/tv/popular", {"api_key": TMDB_API_KEY, "page": "1"}),
                 (f"{TMDB_BASE}/movie/top_rated", {"api_key": TMDB_API_KEY, "page": "1"}),
+                (f"{TMDB_BASE}/discover/tv", {"api_key": TMDB_API_KEY, "with_genres": "16", "sort_by": "popularity.desc", "page": "1"}),
             ]
             responses = []
             for url, params in urls:
                 async with session.get(url, params=params) as r:
                     responses.append(await r.json())
+            try:
+                async with session.get(f"{JIKAN_BASE}/top/anime", params={"filter": "airing", "limit": "20"}) as r:
+                    mal_response = await r.json()
+            except Exception:
+                mal_response = {"data": []}
 
         def fmt(items, media_type=None):
-            out = []
-            for r in items[:20]:
-                mt = media_type or r.get("media_type", "movie")
-                title = r.get("title") or r.get("name", "")
-                date = r.get("release_date") or r.get("first_air_date", "")
-                year = date[:4] if date else ""
-                poster = f"https://image.tmdb.org/t/p/w342{r['poster_path']}" if r.get("poster_path") else None
-                backdrop = f"https://image.tmdb.org/t/p/w1280{r['backdrop_path']}" if r.get("backdrop_path") else None
-                out.append({
-                    "id": r["id"], "title": title, "year": year, "type": mt,
-                    "rating": round(r.get("vote_average", 0), 1),
-                    "poster": poster, "backdrop": backdrop,
-                    "overview": r.get("overview", ""),
-                    "genres": r.get("genre_ids", [])
-                })
-            return out
+            return [tmdb_item(r, media_type) for r in items[:20]]
 
         trending_all = fmt(responses[0].get("results", []))
         popular_movies = fmt(responses[1].get("results", []), "movie")
         popular_tv = fmt(responses[2].get("results", []), "tv")
         top_rated = fmt(responses[3].get("results", []), "movie")
+        popular_anime = unique_media(fmt(responses[4].get("results", []), "anime") + [jikan_item(r) for r in mal_response.get("data", []) if r.get("mal_id")])
+        mixed_trending = unique_media(trending_all + popular_anime[:8])
 
-        hero = next((x for x in trending_all if x["backdrop"]), trending_all[0] if trending_all else None)
+        hero = next((x for x in mixed_trending if x["backdrop"]), mixed_trending[0] if mixed_trending else None)
 
         return web.json_response({
             "hero": hero,
-            "trending": trending_all,
+            "trending": mixed_trending,
             "popular_movies": popular_movies,
             "popular_tv": popular_tv,
+            "popular_anime": popular_anime,
             "top_rated": top_rated,
             "bot_username": temp.U_NAME
         })
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+
+@routes.get("/api/airing-today")
+async def airing_today_handler(request):
+    if not TMDB_API_KEY:
+        return web.json_response({"results": [], "error": "TMDB API key not configured"}, status=503)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{TMDB_BASE}/tv/airing_today", params={"api_key": TMDB_API_KEY, "page": "1"}) as resp:
+                tmdb_data = await resp.json()
+            try:
+                async with session.get(f"{JIKAN_BASE}/seasons/now", params={"limit": "20"}) as resp:
+                    mal_data = await resp.json()
+            except Exception:
+                mal_data = {"data": []}
+        today = datetime.now(timezone.utc).date().isoformat()
+        results = []
+        for item in tmdb_data.get("results", [])[:16]:
+            model = tmdb_item(item, "tv")
+            details = {}
+            try:
+                async with session.get(f"{TMDB_BASE}/tv/{item.get('id')}", params={"api_key": TMDB_API_KEY}) as detail_resp:
+                    details = await detail_resp.json()
+            except Exception:
+                details = {}
+            next_episode = fmt_episode(details.get("next_episode_to_air") or details.get("last_episode_to_air"))
+            network = next((network.get("name") for network in details.get("networks", []) if network.get("name")), "")
+            model.update({
+                "episode_label": detail_episode_label(next_episode) if next_episode else "New episode",
+                "episode_name": next_episode.get("name") if next_episode else item.get("name", ""),
+                "air_time": next_episode.get("air_date") if next_episode else format_date(item.get("first_air_date")),
+                "platform": network or "TMDB",
+            })
+            results.append(model)
+        for item in mal_data.get("data", [])[:20]:
+            model = jikan_item(item)
+            broadcast = item.get("broadcast", {}) or {}
+            model.update({
+                "episode_label": f"S{item.get('season') or ''}|E{item.get('episodes') or '?'}".replace("S|", "S?|" ),
+                "episode_name": item.get("title_japanese") or item.get("title") or "",
+                "air_time": broadcast.get("time") or broadcast.get("day") or today,
+                "platform": "MyAnimeList",
+            })
+            results.append(model)
+        return web.json_response({"results": results[:35]})
+    except Exception as e:
+        return web.json_response({"results": [], "error": str(e)}, status=500)
 
 
 @routes.get("/api/repair-status")
@@ -381,7 +627,7 @@ async def media_download(request, message_id: int):
         headers={
             "Content-Type": mime_type,
             "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
-            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Content-Disposition": f'inline; filename="{file_name}"',
             "Accept-Ranges": "bytes",
         }
     )
