@@ -1186,7 +1186,7 @@ function renderRow(containerId, items) {
 
 // ── LOAD HOME ─────────────────────────────────────────────────────────────
 async function loadHome() {
-    // Check repair mode first
+    // 1. Check repair mode first
     try {
         const rs = await fetch('/api/repair-status');
         const rd = await rs.json();
@@ -1196,21 +1196,15 @@ async function loadHome() {
         }
     } catch(e) {}
 
-    // Fire all three fetches in parallel for fastest load
-    const [trendingData, todayData, recentData] = await Promise.allSettled([
-        fetch('/api/tmdb-trending').then(r => r.json()),
-        fetch('/api/today-airing').then(r => r.json()),
-        fetch('/api/recently-added').then(r => r.json()),
-    ]);
-
-    // ── TMDB Trending / home rows ─────────────────────────────────────
+    // 2. Load trending immediately — this is the critical first paint
+    let trendingMovies = [];
     try {
-        const data = trendingData.value || {};
+        const resp = await fetch('/api/tmdb-trending');
+        const data = await resp.json();
         botUsername = data.bot_username || botUsername;
 
-        // Hero
         heroItems = (data.trending || []).filter(x => x.backdrop).slice(0, 6);
-        if (heroItems.length === 0) heroItems = (data.trending || []).slice(0, 6);
+        if (!heroItems.length) heroItems = (data.trending || []).slice(0, 6);
         if (heroItems.length > 0) {
             setHero(heroItems[0]);
             const dotsEl = document.getElementById('heroDots');
@@ -1225,55 +1219,59 @@ async function loadHome() {
         }
 
         if (data.trending)       { renderRow('rowTrending',  data.trending);       enableDragScroll(document.getElementById('rowTrending')); }
-        if (data.popular_movies) { renderRow('rowMovies',    data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); }
+        if (data.popular_movies) { renderRow('rowMovies',    data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); trendingMovies = data.popular_movies; }
         if (data.popular_tv)     { renderRow('rowTV',        data.popular_tv);     enableDragScroll(document.getElementById('rowTV')); }
         if (data.top_rated)      { renderRow('rowTopRated',  data.top_rated);      enableDragScroll(document.getElementById('rowTopRated')); }
         if (data.popular_anime)  { renderRow('rowAnime',     data.popular_anime);  enableDragScroll(document.getElementById('rowAnime')); }
     } catch(e) {
-        console.error('Failed to load trending:', e);
+        console.error('Trending load failed:', e);
         document.getElementById('heroTitle').textContent = 'Failed to load';
     }
 
-    // ── TODAY Released (TV series · Anime · OTT movies) ──────────────
-    try {
-        const td = todayData.value || {};
-        const tvItems    = (td.tv    || []).map(x => ({...x, type: x.type || 'tv'}));
-        const animeItems = (td.anime || []).map(x => ({...x, type: x.type || 'anime'}));
+    // 3. Load today-airing + recently-added in background — won't block main rows
+    loadTodayReleased(trendingMovies);
+    loadRecentlyAdded();
+}
 
-        // OTT movies: pull from TMDB popular_movies that were released today or this week
-        // We use TMDB's "now_playing" set (returned in trending/popular) filtered by recency
-        // For simplicity use recent popular movies from trendingData
-        const allMovies = ((trendingData.value || {}).popular_movies || []);
-        const today = new Date().toISOString().slice(0, 10);
-        const thisWeekMovies = allMovies.slice(0, 10).map(x => ({...x, type: 'movie'}));
+async function loadTodayReleased(trendingMovies) {
+    try {
+        const resp = await fetch('/api/today-airing');
+        const td   = await resp.json();
+        const tvItems    = (td.tv    || []).map(x => ({...x, type: 'tv'}));
+        const animeItems = (td.anime || []).map(x => ({...x, type: 'anime'}));
+        const ottMovies  = (trendingMovies || []).slice(0, 10).map(x => ({...x, type: 'movie'}));
 
         window._todayAllItems = {
-            all:   [...tvItems, ...animeItems, ...thisWeekMovies],
+            all:   [...tvItems, ...animeItems, ...ottMovies],
             tv:    tvItems,
             anime: animeItems,
-            movie: thisWeekMovies,
+            movie: ottMovies,
         };
         renderTodayReleasedRow('all');
         enableDragScroll(document.getElementById('rowTodayReleased'));
     } catch(e) {
-        console.error('Failed to load today released:', e);
-        document.getElementById('rowTodayReleased').innerHTML =
-            '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load today\'s releases.</div>';
+        console.error('Today released load failed:', e);
+        const el = document.getElementById('rowTodayReleased');
+        if (el) el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load today\'s releases.</div>';
     }
+}
 
-    // ── Recently Added (bot DB) ───────────────────────────────────────
+async function loadRecentlyAdded() {
     try {
-        const rd = recentData.value || {};
-        const files = rd.files || [];
+        const resp  = await fetch('/api/recently-added');
+        const data  = await resp.json();
+        const files = data.files || [];
         if (files.length > 0) {
             renderRecentlyAdded(files);
             enableDragScroll(document.getElementById('rowRecentlyAdded'));
         } else {
-            document.getElementById('recentlyAddedSection').style.display = 'none';
+            const sec = document.getElementById('recentlyAddedSection');
+            if (sec) sec.style.display = 'none';
         }
     } catch(e) {
-        console.error('Failed to load recently added:', e);
-        document.getElementById('recentlyAddedSection').style.display = 'none';
+        console.error('Recently added load failed:', e);
+        const sec = document.getElementById('recentlyAddedSection');
+        if (sec) sec.style.display = 'none';
     }
 }
 
