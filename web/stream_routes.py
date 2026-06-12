@@ -1,7 +1,15 @@
 import math
 import secrets
 import mimetypes
-from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, OMDB_API_KEY, TVDB_API_KEY
+from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+try:
+    from info import OMDB_API_KEY
+except ImportError:
+    OMDB_API_KEY = None
+try:
+    from info import TVDB_API_KEY
+except ImportError:
+    TVDB_API_KEY = None
 from utils import temp, get_size, handle_next_back, get_plan_name
 from aiohttp import web
 from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
@@ -639,6 +647,192 @@ async def tmdb_trending_handler(request):
 async def repair_status_handler(request):
     repair = await db.get_repair_mode()
     return web.json_response({"repair_mode": repair})
+
+
+@routes.get("/api/recently-added")
+async def recently_added_handler(request):
+    """Returns the 30 most recently indexed files from the bot's database,
+    enriched with TMDB/MAL data where available for poster images."""
+    limit = min(int(request.query.get("limit", 30)), 60)
+    try:
+        from database.ia_filterdb import collection, second_collection, SECOND_FILES_DATABASE_URL
+        results = []
+        cursor1 = collection.find({}).sort("_id", -1).limit(limit)
+        docs = await cursor1.to_list(length=limit)
+        results.extend(docs)
+
+        if SECOND_FILES_DATABASE_URL and second_collection is not None and len(results) < limit:
+            remaining = limit - len(results)
+            cursor2 = second_collection.find({}).sort("_id", -1).limit(remaining)
+            docs2 = await cursor2.to_list(length=remaining)
+            results.extend(docs2)
+
+        files = []
+        for doc in results:
+            model = file_model(doc)
+            files.append({
+                "id": model["id"],
+                "name": model["name"],
+                "size": model["size"],
+                "title": model["title"],
+                "year": model.get("year"),
+                "season": model.get("season"),
+                "episode": model.get("episode"),
+            })
+
+        # Enrich with TMDB poster/backdrop if API key available (best-effort, fast)
+        enriched = []
+        if TMDB_API_KEY and files:
+            async with aiohttp.ClientSession() as session:
+                # Batch: pick unique titles (up to 20) to avoid too many API calls
+                seen_titles = set()
+                title_meta = {}
+                for f in files:
+                    t = (f["title"] or "").strip().lower()
+                    if t and t not in seen_titles and len(seen_titles) < 20:
+                        seen_titles.add(t)
+                        data = await fetch_json(
+                            session,
+                            f"{TMDB_BASE}/search/multi",
+                            params={"api_key": TMDB_API_KEY, "query": f["title"], "page": "1"}
+                        )
+                        best = next((r for r in data.get("results", [])
+                                     if r.get("media_type") in ("movie", "tv")
+                                     and r.get("poster_path")), None)
+                        if best:
+                            mt = best.get("media_type", "movie")
+                            title_meta[t] = {
+                                "poster": tmdb_img(best.get("poster_path"), "w342"),
+                                "backdrop": tmdb_img(best.get("backdrop_path"), "w780"),
+                                "rating": round(best.get("vote_average") or 0, 1),
+                                "type": mt,
+                                "overview": best.get("overview") or "",
+                                "tmdb_id": best.get("id"),
+                            }
+
+                for f in files:
+                    t = (f["title"] or "").strip().lower()
+                    meta = title_meta.get(t, {})
+                    enriched.append({**f, **meta})
+        else:
+            enriched = [dict(f, poster=None, backdrop=None, rating=0,
+                             type="movie", overview="", tmdb_id=None) for f in files]
+
+        return web.json_response({"files": enriched})
+    except Exception as e:
+        return web.json_response({"files": [], "error": str(e)}, status=500)
+
+
+@routes.get("/api/today-airing")
+async def today_airing_handler(request):
+    """Returns TV shows and anime airing today, with season/episode numbers and IDs for IMDb, TVDB, TMDB, and MAL."""
+    if not TMDB_API_KEY:
+        return web.json_response({"error": "TMDB API key not configured"}, status=503)
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        async with aiohttp.ClientSession() as session:
+            # 1. TMDB: TV shows airing today
+            tv_data = await fetch_json(
+                session, f"{TMDB_BASE}/tv/airing_today",
+                params={"api_key": TMDB_API_KEY, "page": "1"}
+            )
+            # 2. Jikan: anime airing today (schedule)
+            # Use Jikan's schedules endpoint — day names in English
+            day_name = datetime.now(timezone.utc).strftime("%A").lower()
+            anime_sched = await fetch_json(
+                session, f"{JIKAN_BASE}/schedules",
+                params={"filter": day_name, "limit": 25}
+            )
+
+        tv_shows = []
+        for show in (tv_data.get("results") or [])[:25]:
+            # Try to pull season/episode from TMDB external IDs quickly (non-blocking best-effort)
+            imdb_id = None
+            tvdb_id = None
+            episode_name = None
+            season_num = None
+            episode_num = None
+            network = None
+
+            # Get network from origin_country / networks field if present
+            if show.get("networks"):
+                network = show["networks"][0].get("name") if show["networks"] else None
+            elif show.get("origin_country"):
+                network = show["origin_country"][0] if show["origin_country"] else None
+
+            tv_shows.append({
+                "tmdb_id": show.get("id"),
+                "imdb_id": imdb_id,
+                "tvdb_id": tvdb_id,
+                "mal_id": None,
+                "title": show.get("name") or show.get("original_name") or "",
+                "year": (show.get("first_air_date") or "")[:4],
+                "type": "tv",
+                "rating": round(show.get("vote_average") or 0, 1),
+                "poster": tmdb_img(show.get("poster_path"), "w342"),
+                "overview": (show.get("overview") or "")[:200],
+                "network": network,
+                "season": season_num,
+                "episode": episode_num,
+                "episode_name": episode_name,
+            })
+
+        # For the top 10 shows, enrich with season/episode/IDs from TMDB details (async fan-out)
+        async def enrich_tv(item):
+            try:
+                async with aiohttp.ClientSession() as s:
+                    ext = await fetch_json(s, f"{TMDB_BASE}/tv/{item['tmdb_id']}/external_ids",
+                                           params={"api_key": TMDB_API_KEY})
+                    item["imdb_id"] = ext.get("imdb_id")
+                    item["tvdb_id"] = ext.get("tvdb_id")
+                    # Latest episode airing
+                    detail = await fetch_json(s, f"{TMDB_BASE}/tv/{item['tmdb_id']}",
+                                              params={"api_key": TMDB_API_KEY})
+                    ep = detail.get("next_episode_to_air") or detail.get("last_episode_to_air") or {}
+                    if ep:
+                        item["season"]       = ep.get("season_number")
+                        item["episode"]      = ep.get("episode_number")
+                        item["episode_name"] = ep.get("name")
+                    if not item.get("network") and detail.get("networks"):
+                        item["network"] = detail["networks"][0].get("name") if detail["networks"] else None
+            except Exception:
+                pass
+            return item
+
+        enriched = await asyncio.gather(*[enrich_tv(show) for show in tv_shows[:10]])
+        tv_shows[:10] = list(enriched)
+
+        # Anime list
+        anime_list = []
+        for anime in (anime_sched.get("data") or [])[:25]:
+            images = (anime.get("images") or {}).get("jpg") or {}
+            aired = (anime.get("aired") or {})
+            year = str(anime.get("year") or str(aired.get("from") or "")[:4])
+            anime_list.append({
+                "tmdb_id": None,
+                "imdb_id": None,
+                "tvdb_id": None,
+                "mal_id": anime.get("mal_id"),
+                "title": anime.get("title_english") or anime.get("title") or "",
+                "year": year,
+                "type": "anime",
+                "rating": round(anime.get("score") or 0, 1),
+                "poster": images.get("large_image_url") or images.get("image_url"),
+                "overview": (anime.get("synopsis") or "")[:200],
+                "network": (anime.get("broadcast") or {}).get("string"),
+                "season": None,
+                "episode": anime.get("episodes"),
+                "episode_name": None,
+            })
+
+        return web.json_response({
+            "date": today,
+            "tv": tv_shows,
+            "anime": anime_list
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 
 async def media_download(request, message_id: int):
