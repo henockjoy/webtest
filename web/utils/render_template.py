@@ -61,13 +61,57 @@ webapp_template = """
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
             white-space: nowrap;
         }
-        .nav-right { display: flex; align-items: center; gap: 6px; }
-        .nav-search-toggle {
-            background: none; border: none; color: var(--text2); cursor: pointer;
-            width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
-            border-radius: 50%; transition: background 0.2s, color 0.2s;
+        .nav-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .nav-right { display: flex; align-items: center; gap: 8px; }
+        .nav-search-inline {
+            width: min(34vw, 210px); min-width: 118px;
+            height: 36px; display: flex; align-items: center; gap: 8px;
+            background: rgba(30,30,42,0.78); border: 1px solid var(--border);
+            border-radius: 999px; padding: 0 12px; color: var(--text3);
         }
-        .nav-search-toggle:hover { background: var(--card2); color: #fff; }
+        .nav-search-inline:focus-within {
+            border-color: rgba(229,9,20,0.45);
+            box-shadow: 0 0 14px rgba(229,9,20,0.18);
+        }
+        .nav-search-inline input {
+            width: 100%; min-width: 0; border: none; outline: none; background: transparent;
+            color: #fff; font: 600 13px 'Outfit', sans-serif;
+        }
+        .nav-search-inline input::placeholder { color: var(--text3); }
+        .airing-wrap { position: relative; }
+        .airing-toggle {
+            height: 36px; border: 1px solid var(--border); background: rgba(30,30,42,0.78);
+            color: var(--text2); border-radius: 999px; padding: 0 12px;
+            font: 700 12px 'Outfit', sans-serif; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .airing-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.14); }
+        .airing-menu {
+            position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px;
+            max-width: 560px; margin: 0 auto; z-index: 180;
+            background: rgba(16,16,24,0.98); border: 1px solid var(--border);
+            border-radius: 16px; box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+            opacity: 0; visibility: hidden; transform: translateY(-8px);
+            transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+            overflow: hidden;
+        }
+        .airing-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
+        .airing-menu-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px; border-bottom: 1px solid var(--border);
+            font-size: 13px; font-weight: 800;
+        }
+        .airing-list { max-height: 420px; overflow-y: auto; padding: 8px; }
+        .airing-card {
+            display: grid; grid-template-columns: 46px 1fr; gap: 10px;
+            padding: 9px; border-radius: 10px; cursor: pointer;
+        }
+        .airing-card:hover { background: var(--card2); }
+        .airing-card img, .airing-thumb {
+            width: 46px; height: 64px; object-fit: cover; border-radius: 7px; background: var(--card2);
+        }
+        .airing-title { font-size: 13px; font-weight: 800; line-height: 1.25; margin-bottom: 4px; }
+        .airing-meta { font-size: 11px; color: var(--text3); line-height: 1.45; }
 
         /* ── SEARCH OVERLAY ── */
         .search-overlay {
@@ -398,6 +442,35 @@ webapp_template = """
         .modal-files {
             overflow-y: auto; flex: 1; padding: 0 12px 20px;
         }
+        .modal-detail-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px; padding: 0 20px 12px;
+        }
+        .detail-pill {
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+            border-radius: 10px; padding: 8px 10px; min-width: 0;
+        }
+        .detail-pill b {
+            display: block; color: var(--text3); font-size: 9px; text-transform: uppercase;
+            letter-spacing: 0.8px; margin-bottom: 3px;
+        }
+        .detail-pill span { color: var(--text2); font-size: 12px; font-weight: 700; }
+        .trailer-panel {
+            position: sticky; top: 0; z-index: 2;
+            background: var(--card); padding: 0 20px 12px;
+        }
+        .trailer-frame {
+            width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px;
+            background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        }
+        .file-filters {
+            display: flex; gap: 8px; padding: 0 20px 12px; flex-shrink: 0;
+        }
+        .file-filter {
+            flex: 1; min-width: 0; background: var(--card2); color: var(--text2);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 9px 10px; font: 700 12px 'Outfit', sans-serif;
+        }
         .file-item {
             display: flex; align-items: center; gap: 12px;
             padding: 14px 12px; border-radius: var(--radius);
@@ -432,6 +505,11 @@ webapp_template = """
             overflow: hidden; line-height: 1.4; margin-bottom: 3px;
         }
         .file-item-size { font-size: 11px; color: var(--text3); font-weight: 500; }
+        .file-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .file-tag {
+            font-size: 10px; color: var(--text2); background: rgba(255,255,255,0.055);
+            border: 1px solid var(--border); border-radius: 999px; padding: 2px 7px;
+        }
         .file-item-get {
             width: 30px; height: 30px; flex-shrink: 0;
             background: rgba(229,9,20,0.15); border-radius: 50%;
@@ -522,6 +600,27 @@ webapp_template = """
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        .action-backdrop {
+            position: fixed; inset: 0; z-index: 420; background: rgba(0,0,0,0.72);
+            display: flex; align-items: flex-end; justify-content: center;
+            opacity: 0; visibility: hidden; transition: opacity 0.22s, visibility 0.22s;
+        }
+        .action-backdrop.open { opacity: 1; visibility: visible; }
+        .action-sheet {
+            width: 100%; max-width: 420px; background: var(--card);
+            border-radius: 18px 18px 0 0; border: 1px solid var(--border);
+            padding: 16px; transform: translateY(100%); transition: transform 0.25s;
+        }
+        .action-backdrop.open .action-sheet { transform: translateY(0); }
+        .action-title { font-size: 15px; font-weight: 800; margin-bottom: 12px; line-height: 1.35; }
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .action-btn {
+            border: 1px solid var(--border); border-radius: 11px; background: var(--card2);
+            color: #fff; text-decoration: none; padding: 12px 10px;
+            font: 800 13px 'Outfit', sans-serif; text-align: center; cursor: pointer;
+        }
+        .action-btn.primary { background: var(--accent); border-color: rgba(229,9,20,0.6); }
+
         /* ── FOOTER ── */
         .site-footer {
             background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%);
@@ -583,6 +682,13 @@ webapp_template = """
             .hero-overview { max-width: 52%; font-size: 15px; }
             .search-results-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
         }
+        @media (max-width: 430px) {
+            .navbar { padding-left: 12px; padding-right: 12px; }
+            .nav-logo { font-size: 16px; }
+            .airing-toggle span { display: none; }
+            .nav-search-inline { width: 128px; }
+            .modal-detail-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -596,13 +702,34 @@ webapp_template = """
 
 <!-- NAVBAR -->
 <nav class="navbar" id="navbar">
-    <div class="nav-logo">Filmotainment</div>
+    <div class="nav-left">
+        <div class="nav-logo">Filmotainment</div>
+        <div class="airing-wrap">
+            <button class="airing-toggle" id="airingToggle" onclick="toggleAiringMenu()">
+                Today <span>Airing</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+        </div>
+    </div>
     <div class="nav-right">
-        <button class="nav-search-toggle" id="searchToggle" onclick="openSearch()" title="Search">
+        <label class="nav-search-inline" title="Search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
+            <input id="navSearchField" type="text" placeholder="Search" onclick="openSearch()" onfocus="openSearch()" readonly>
+        </label>
     </div>
 </nav>
+
+<div class="airing-menu" id="airingMenu">
+    <div class="airing-menu-head">
+        <span>Anime & TV airing today</span>
+        <button class="modal-close-btn" onclick="closeAiringMenu()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="airing-list" id="airingList">
+        <div class="modal-loading"><div class="spinner"></div>Loading today's episodes...</div>
+    </div>
+</div>
 
 <!-- SEARCH OVERLAY -->
 <div class="search-overlay" id="searchOverlay">
@@ -680,8 +807,20 @@ webapp_template = """
         </div>
     </section>
 
+    <!-- Popular Anime Row -->
+    <section class="row-section fade-up" style="animation-delay:0.20s">
+        <div class="row-header">
+            <div class="row-title"><span></span>Popular Anime</div>
+        </div>
+        <div class="poster-scroll" id="rowAnime">
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div>
+        </div>
+    </section>
+
     <!-- Top Rated Row -->
-    <section class="row-section fade-up" style="animation-delay:0.24s">
+    <section class="row-section fade-up" style="animation-delay:0.28s">
         <div class="row-header">
             <div class="row-title"><span></span>Top Rated</div>
         </div>
@@ -721,8 +860,28 @@ webapp_template = """
             </button>
         </div>
         <div class="modal-divider"></div>
+        <div id="modalDetails"></div>
+        <div id="modalTrailer"></div>
         <div class="modal-files-label">Available Files</div>
+        <div class="file-filters" id="fileFilters" style="display:none">
+            <select class="file-filter" id="qualityFilter" onchange="applyFileFilters()"></select>
+            <select class="file-filter" id="languageFilter" onchange="applyFileFilters()"></select>
+        </div>
         <div class="modal-files" id="modalFiles"></div>
+    </div>
+</div>
+
+<div class="action-backdrop" id="actionBackdrop" onclick="handleActionBackdrop(event)">
+    <div class="action-sheet">
+        <div class="action-title" id="actionTitle">Choose an action</div>
+        <div class="action-grid">
+            <button class="action-btn primary" id="actionWatch">Watch</button>
+            <a class="action-btn" id="actionDownload" href="#" download>Download</a>
+            <a class="action-btn" id="actionVlc" href="#">VLC</a>
+            <a class="action-btn" id="actionMx" href="#">MX Player</a>
+            <a class="action-btn" id="actionSplayer" href="#">SPlayer</a>
+            <button class="action-btn" onclick="closeActionSheet()">Cancel</button>
+        </div>
     </div>
 </div>
 
@@ -740,6 +899,9 @@ if (tg) {
 const user = tg?.initDataUnsafe?.user;
 const userId = user?.id || 'unknown';
 let botUsername = '';
+let allModalFiles = [];
+let currentFilteredFiles = [];
+let airingLoaded = false;
 
 // Auto-update copyright year
 document.getElementById('footerYear').textContent = new Date().getFullYear();
@@ -800,7 +962,7 @@ function setHero(item) {
         ${item.rating > 0 ? `<span class="rating">⭐ ${item.rating}</span><span class="dot"></span>` : ''}
         <span>${item.year || ''}</span>
         ${item.year ? '<span class="dot"></span>' : ''}
-        <span style="text-transform:capitalize">${item.type === 'tv' ? 'TV Show' : 'Movie'}</span>
+        <span style="text-transform:capitalize">${item.type === 'anime' ? 'Anime' : (item.type === 'tv' ? 'TV Show' : 'Movie')}</span>
     `;
     btn.onclick = () => openModal(item);
 }
@@ -837,10 +999,10 @@ function renderRow(containerId, items) {
             <div class="poster-img-wrap">
                 ${posterHTML}
                 ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+                <div class="poster-type-badge">${item.type === 'anime' ? 'Anime' : (item.type === 'tv' ? 'TV' : 'Movie')}</div>
             </div>
             <div class="poster-title">${item.title}</div>
-            ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
+            ${item.year ? `<div class="poster-year">${item.year}${item.source ? ` • ${item.source}` : ''}</div>` : ''}
         `;
         card.onclick = () => openModal(item);
         el.appendChild(card);
@@ -885,6 +1047,7 @@ async function loadHome() {
         if (data.trending) { renderRow('rowTrending', data.trending); enableDragScroll(document.getElementById('rowTrending')); }
         if (data.popular_movies) { renderRow('rowMovies', data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); }
         if (data.popular_tv) { renderRow('rowTV', data.popular_tv); enableDragScroll(document.getElementById('rowTV')); }
+        if (data.popular_anime) { renderRow('rowAnime', data.popular_anime); enableDragScroll(document.getElementById('rowAnime')); }
         if (data.top_rated) { renderRow('rowTopRated', data.top_rated); enableDragScroll(document.getElementById('rowTopRated')); }
 
     } catch(e) {
@@ -961,7 +1124,7 @@ async function doSearch(q) {
                 <div class="poster-img-wrap">
                     ${posterHTML}
                     ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                    <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+                    <div class="poster-type-badge">${item.type === 'anime' ? 'Anime' : (item.type === 'tv' ? 'TV' : 'Movie')}</div>
                 </div>
                 <div class="poster-title">${item.title}</div>
                 ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
@@ -979,6 +1142,8 @@ let currentItem = null;
 
 async function openModal(item) {
     currentItem = item;
+    allModalFiles = [];
+    currentFilteredFiles = [];
     // Populate header
     const posterWrap = document.getElementById('modalPosterWrap');
     const info = document.getElementById('modalInfo');
@@ -1007,14 +1172,17 @@ async function openModal(item) {
         <div class="modal-meta">
             ${item.rating > 0 ? `<span class="rating">⭐ ${item.rating}</span>` : ''}
             ${item.year ? `<span>${item.year}</span>` : ''}
-            <span style="text-transform:capitalize">${item.type === 'tv' ? 'TV Show' : 'Movie'}</span>
+            <span style="text-transform:capitalize">${item.type === 'anime' ? 'Anime' : (item.type === 'tv' ? 'TV Show' : 'Movie')}</span>
         </div>
         ${genrePills}
         ${item.overview ? `<div class="modal-overview">${item.overview}</div>` : ''}
     `;
+    document.getElementById('modalDetails').innerHTML = `<div class="modal-detail-grid"><div class="detail-pill"><b>Source</b><span>${escapeHTML(item.source || 'TMDB')}</span></div><div class="detail-pill"><b>Rating</b><span>${item.rating || 'NA'}</span></div></div>`;
+    document.getElementById('modalTrailer').innerHTML = '';
     // Show modal
     document.getElementById('modalBackdrop').classList.add('open');
     document.body.style.overflow = 'hidden';
+    loadMediaDetails(item);
     // Load files
     await loadFilesForItem(item);
 }
@@ -1023,6 +1191,8 @@ function closeModal() {
     document.getElementById('modalBackdrop').classList.remove('open');
     document.body.style.overflow = '';
     currentItem = null;
+    document.getElementById('modalTrailer').innerHTML = '';
+    document.getElementById('fileFilters').style.display = 'none';
 }
 
 function handleBackdropClick(e) {
@@ -1046,6 +1216,44 @@ function seasonLabel(season) {
     return season === 'other' ? 'Other' : `Season ${season}`;
 }
 
+function detailEpisodeCode(episode) {
+    const season = episode.season !== null && episode.season !== undefined ? `S${String(episode.season).padStart(2, '0')}` : 'S--';
+    const ep = episode.episode !== null && episode.episode !== undefined ? `E${String(episode.episode).padStart(2, '0')}` : 'E--';
+    return `${season}|${ep}`;
+}
+
+async function loadMediaDetails(item) {
+    if (!item.id || item.source === 'MyAnimeList') return;
+    try {
+        const mediaType = item.type === 'anime' ? 'tv' : item.type;
+        const resp = await fetch(`/api/media-details?id=${encodeURIComponent(item.id)}&type=${encodeURIComponent(mediaType)}`);
+        const details = await resp.json();
+        if (currentItem !== item || details.error) return;
+        const fields = [];
+        if (details.runtime) fields.push(['Runtime', details.runtime]);
+        if (details.type === 'movie' && details.ott_status) fields.push(['OTT Date', details.ott_status]);
+        if (details.type === 'tv' && details.first_air_date) fields.push(['Aired', details.first_air_date]);
+        if (details.next_episode) fields.push(['Next Episode', `${detailEpisodeCode(details.next_episode)} ${details.next_episode.air_date || ''}`.trim()]);
+        if (details.providers) fields.push(['Platform', details.providers]);
+        if (details.external_ids?.imdb_id) fields.push(['IMDb', details.external_ids.imdb_id]);
+        if (details.external_ids?.tvdb_id) fields.push(['TVDB', details.external_ids.tvdb_id]);
+        if (details.genres?.length) fields.push(['Genre', details.genres.slice(0, 2).join(', ')]);
+        const quote = details.tagline || details.overview || item.overview || '';
+        document.getElementById('modalDetails').innerHTML = `
+            <div class="modal-detail-grid">
+                ${fields.slice(0, 8).map(([label, value]) => `<div class="detail-pill"><b>${escapeHTML(label)}</b><span>${escapeHTML(value)}</span></div>`).join('')}
+            </div>
+            ${quote ? `<div class="modal-overview" style="padding:0 20px 12px; -webkit-line-clamp:2;">"${escapeHTML(quote)}"</div>` : ''}
+        `;
+        if (details.trailer_key) {
+            document.getElementById('modalTrailer').innerHTML = `
+                <div class="trailer-panel">
+                    <iframe class="trailer-frame" src="https://www.youtube.com/embed/${encodeURIComponent(details.trailer_key)}?autoplay=1&mute=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                </div>`;
+        }
+    } catch(e) {}
+}
+
 function renderFileRow(file, compact=false) {
     const el = document.createElement('div');
     el.className = 'file-item';
@@ -1059,12 +1267,16 @@ function renderFileRow(file, compact=false) {
         <div class="file-item-info">
             <div class="file-item-name">${escapeHTML(file.name)}</div>
             <div class="file-item-size">${escapeHTML(file.size)}</div>
+            <div class="file-tags">
+                <span class="file-tag">${escapeHTML(file.quality || 'Unknown')}</span>
+                <span class="file-tag">${escapeHTML(file.language || 'Unknown')}</span>
+            </div>
         </div>
         <div class="file-item-get">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
         </div>
     `;
-    el.onclick = () => getFile(file.id);
+    el.onclick = () => openActionSheet(file);
     return el;
 }
 
@@ -1137,6 +1349,42 @@ function renderSeasonFiles(filesEl, files) {
     drawSeason(active);
 }
 
+function uniqueValues(files, key) {
+    return [...new Set(files.map(file => file[key] || 'Unknown'))].sort((a, b) => a.localeCompare(b));
+}
+
+function setupFileFilters(files) {
+    const filters = document.getElementById('fileFilters');
+    const qualitySelect = document.getElementById('qualityFilter');
+    const languageSelect = document.getElementById('languageFilter');
+    qualitySelect.innerHTML = `<option value="">All quality</option>` + uniqueValues(files, 'quality').map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`).join('');
+    languageSelect.innerHTML = `<option value="">All language</option>` + uniqueValues(files, 'language').map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`).join('');
+    filters.style.display = files.length ? 'flex' : 'none';
+}
+
+function drawFiles(files) {
+    const filesEl = document.getElementById('modalFiles');
+    if (!files.length) {
+        filesEl.innerHTML = `<div class="modal-empty"><div class="modal-empty-title">No matching files</div><div class="modal-empty-sub">Try another quality or language filter.</div></div>`;
+        return;
+    }
+    if (currentItem && (currentItem.type === 'tv' || currentItem.type === 'anime')) {
+        renderSeasonFiles(filesEl, files);
+    } else {
+        filesEl.innerHTML = '';
+        files.forEach(file => filesEl.appendChild(renderFileRow(file)));
+    }
+}
+
+function applyFileFilters() {
+    const quality = document.getElementById('qualityFilter').value;
+    const language = document.getElementById('languageFilter').value;
+    currentFilteredFiles = allModalFiles.filter(file => {
+        return (!quality || file.quality === quality) && (!language || file.language === language);
+    });
+    drawFiles(currentFilteredFiles);
+}
+
 async function loadFilesForItem(item) {
     const filesEl = document.getElementById('modalFiles');
     filesEl.innerHTML = `<div class="modal-loading"><div class="spinner"></div>Searching files...</div>`;
@@ -1151,19 +1399,40 @@ async function loadFilesForItem(item) {
                 </div>`;
             return;
         }
-        if (item.type === 'tv') {
-            renderSeasonFiles(filesEl, files);
-        } else {
-            filesEl.innerHTML = '';
-            files.forEach(file => filesEl.appendChild(renderFileRow(file)));
-        }
+        allModalFiles = files;
+        currentFilteredFiles = files;
+        setupFileFilters(files);
+        drawFiles(files);
     } catch(e) {
         filesEl.innerHTML = `<div class="modal-empty"><div class="modal-empty-icon">⚠️</div><div class="modal-empty-title">Error</div><div class="modal-empty-sub">Failed to load files.</div></div>`;
     }
 }
 
+function telegramFileLink(fileId) {
+    return `https://t.me/${botUsername}?start=file_0_${fileId}`;
+}
+
+function openActionSheet(file) {
+    const src = `${window.location.origin}/download/${file.id}`;
+    document.getElementById('actionTitle').textContent = file.name;
+    document.getElementById('actionWatch').onclick = () => { window.location.href = `/watch/${file.id}`; };
+    document.getElementById('actionDownload').href = `/download/${file.id}`;
+    document.getElementById('actionVlc').href = `vlc://${src}`;
+    document.getElementById('actionMx').href = `intent:${src}#Intent;package=com.mxtech.videoplayer.ad;end`;
+    document.getElementById('actionSplayer').href = `intent:${src}#Intent;package=com.splayer.player;end`;
+    document.getElementById('actionBackdrop').classList.add('open');
+}
+
+function closeActionSheet() {
+    document.getElementById('actionBackdrop').classList.remove('open');
+}
+
+function handleActionBackdrop(e) {
+    if (e.target === document.getElementById('actionBackdrop')) closeActionSheet();
+}
+
 function getFile(fileId) {
-    const link = `https://t.me/${botUsername}?start=file_0_${fileId}`;
+    const link = telegramFileLink(fileId);
     if (userId === 'unknown' || !tg?.openTelegramLink) {
         window.open(link, '_blank');
     } else {
@@ -1174,6 +1443,47 @@ function getFile(fileId) {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────
+async function toggleAiringMenu() {
+    const menu = document.getElementById('airingMenu');
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open') && !airingLoaded) {
+        await loadAiringToday();
+    }
+}
+
+function closeAiringMenu() {
+    document.getElementById('airingMenu').classList.remove('open');
+}
+
+async function loadAiringToday() {
+    const list = document.getElementById('airingList');
+    airingLoaded = true;
+    try {
+        const resp = await fetch('/api/airing-today');
+        const data = await resp.json();
+        if (!data.results || !data.results.length) {
+            list.innerHTML = `<div class="modal-empty"><div class="modal-empty-title">No airing data</div><div class="modal-empty-sub">Try again later.</div></div>`;
+            return;
+        }
+        list.innerHTML = '';
+        data.results.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'airing-card';
+            card.innerHTML = `
+                ${item.poster ? `<img src="${item.poster}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<div class="airing-thumb"></div>`}
+                <div>
+                    <div class="airing-title">${escapeHTML(item.title)}</div>
+                    <div class="airing-meta">${escapeHTML(item.episode_label || 'New episode')} • ${escapeHTML(item.episode_name || '')}</div>
+                    <div class="airing-meta">${escapeHTML(item.air_time || 'Today')} • ${escapeHTML(item.platform || item.source || '')}</div>
+                </div>`;
+            card.onclick = () => { closeAiringMenu(); openModal(item); };
+            list.appendChild(card);
+        });
+    } catch(e) {
+        list.innerHTML = `<div class="modal-empty"><div class="modal-empty-title">Failed to load</div><div class="modal-empty-sub">Airing feed is unavailable right now.</div></div>`;
+    }
+}
+
 function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -1378,7 +1688,7 @@ watch_tmplt = """<!DOCTYPE html>
 
         /* Buttons */
         .btn-row {
-            display:grid; grid-template-columns:repeat(3, 1fr); gap:.8rem;
+            display:grid; grid-template-columns:repeat(4, 1fr); gap:.8rem;
             margin-top:1.2rem;
             width:100%; max-width:1060px;
         }
@@ -1425,6 +1735,11 @@ watch_tmplt = """<!DOCTYPE html>
             box-shadow:0 4px 16px rgba(16,185,129,.35);
         }
         .btn-mx:hover { box-shadow:0 7px 24px rgba(16,185,129,.52); }
+        .btn-sp {
+            background:linear-gradient(135deg,#7c2d12,#ef4444,#fb7185);
+            box-shadow:0 4px 16px rgba(239,68,68,.35);
+        }
+        .btn-sp:hover { box-shadow:0 7px 24px rgba(239,68,68,.52); }
 
         /* Footer */
         footer {
@@ -1512,7 +1827,9 @@ watch_tmplt = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <video src="{src}" class="player" playsinline controls></video>
+            <video class="player" playsinline controls preload="metadata" crossorigin="anonymous">
+                <source src="{src}" type="{mime_type}">
+            </video>
         </div>
     </div>
 
@@ -1542,6 +1859,13 @@ watch_tmplt = """<!DOCTYPE html>
                 <polygon points="10 8 16 12 10 16 10 8"/>
             </svg>
             MX Player
+        </a>
+
+        <a href="intent:{src}#Intent;package=com.splayer.player;end" class="xbtn btn-sp">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 5h14v14H5z"/><path d="m10 8 6 4-6 4V8z"/>
+            </svg>
+            SPlayer
         </a>
     </div>
 
@@ -2034,9 +2358,12 @@ async def media_watch(message_id):
     tag = media.mime_type.split('/')[0].strip()
     if tag == 'video':
         heading = html.escape(f'Watch — {media.file_name}')
+        file_name = html.escape(media.file_name or 'Video')
+        mime_type = html.escape(media.mime_type or 'video/mp4')
         html_ = (watch_tmplt
                  .replace('{heading}',   heading)
-                 .replace('{file_name}', media.file_name)
+                 .replace('{file_name}', file_name)
+                 .replace('{mime_type}', mime_type)
                  .replace('{src}',       src))
     else:
         html_ = error_tmplt
