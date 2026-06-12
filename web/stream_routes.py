@@ -1,7 +1,15 @@
 import math
 import secrets
 import mimetypes
-from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, OMDB_API_KEY, TVDB_API_KEY
+from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+try:
+    from info import OMDB_API_KEY
+except ImportError:
+    OMDB_API_KEY = None
+try:
+    from info import TVDB_API_KEY
+except ImportError:
+    TVDB_API_KEY = None
 from utils import temp, get_size, handle_next_back, get_plan_name
 from aiohttp import web
 from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
