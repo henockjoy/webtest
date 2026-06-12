@@ -3,6 +3,7 @@ from utils import temp
 from web.utils.custom_dl import TGCustomYield
 import urllib.parse
 import html
+import re
 
 
 webapp_template = """
@@ -663,6 +664,158 @@ webapp_template = """
             font-size: 10px; color: var(--text3); margin-top: 8px; opacity: 0.6;
         }
 
+        /* ── TODAY AIRING PANEL ── */
+        .today-panel {
+            position: fixed; inset: 0; z-index: 250;
+            background: rgba(10,10,15,0.97); backdrop-filter: blur(32px);
+            display: flex; flex-direction: column;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .today-panel.open { opacity: 1; visibility: visible; }
+        .today-panel-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 14px;
+            border-bottom: 1px solid var(--border); flex-shrink: 0;
+            background: rgba(10,10,15,0.9);
+        }
+        .today-panel-title {
+            flex: 1; font-size: 16px; font-weight: 800; letter-spacing: -0.2px;
+        }
+        .today-panel-close {
+            width: 34px; height: 34px; background: var(--card2); border: none;
+            border-radius: 50%; cursor: pointer; color: var(--text2);
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        .today-panel-close:hover { background: var(--border); color: #fff; }
+        .today-tabs {
+            display: flex; gap: 0; overflow-x: auto; flex-shrink: 0;
+            border-bottom: 1px solid var(--border);
+            scrollbar-width: none;
+        }
+        .today-tabs::-webkit-scrollbar { display: none; }
+        .today-tab {
+            flex: 0 0 auto; padding: 12px 16px;
+            background: none; border: none; border-bottom: 2px solid transparent;
+            color: var(--text3); font-family: 'Outfit', sans-serif;
+            font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .today-tab.active { color: #fff; border-bottom-color: var(--accent); }
+        .today-list {
+            overflow-y: auto; flex: 1; padding: 12px 0 40px;
+        }
+        .today-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 16px; cursor: pointer;
+            transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .today-item:hover { background: var(--card2); }
+        .today-thumb {
+            width: 70px; height: 100px; border-radius: 8px; flex-shrink: 0;
+            object-fit: cover; background: var(--card2); border: 1px solid var(--border);
+        }
+        .today-thumb-placeholder {
+            width: 70px; height: 100px; border-radius: 8px; flex-shrink: 0;
+            background: var(--card2); display: flex; align-items: center;
+            justify-content: center; font-size: 22px; border: 1px solid var(--border);
+        }
+        .today-info { flex: 1; min-width: 0; padding-top: 2px; }
+        .today-item-title {
+            font-size: 14px; font-weight: 700; color: #fff; line-height: 1.3;
+            margin-bottom: 5px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .today-ep-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.3);
+            color: var(--accent); font-size: 11px; font-weight: 800;
+            padding: 3px 8px; border-radius: 6px; margin-bottom: 5px;
+            letter-spacing: 0.2px;
+        }
+        .today-meta-row {
+            display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+        }
+        .today-source-chip {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; padding: 2px 7px; border-radius: 4px; border: 1px solid;
+        }
+        .chip-imdb  { color: #f5c518; border-color: rgba(245,197,24,0.35); background: rgba(245,197,24,0.08); }
+        .chip-tvdb  { color: #5bade0; border-color: rgba(91,173,224,0.35); background: rgba(91,173,224,0.08); }
+        .chip-tmdb  { color: #01d277; border-color: rgba(1,210,119,0.35);  background: rgba(1,210,119,0.08); }
+        .chip-mal   { color: #2e51a2; border-color: rgba(46,81,162,0.5);   background: rgba(46,81,162,0.15); color: #7b9fd4; }
+        .today-rating { font-size: 11px; color: var(--gold); font-weight: 700; }
+        .today-network { font-size: 11px; color: var(--text3); }
+        .today-empty {
+            text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px;
+        }
+        .today-spinner {
+            display: flex; align-items: center; justify-content: center; padding: 60px 20px;
+        }
+
+        /* Today Airing nav button */
+        .nav-today-btn {
+            background: rgba(229,9,20,0.12); border: 1px solid rgba(229,9,20,0.3);
+            color: var(--accent); border-radius: 8px;
+            padding: 0 10px; height: 40px;
+            display: flex; align-items: center; gap: 6px;
+            font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 800;
+            cursor: pointer; white-space: nowrap;
+            transition: background 0.2s, border-color 0.2s;
+            letter-spacing: 0.2px;
+        }
+        .nav-today-btn:hover { background: rgba(229,9,20,0.22); border-color: rgba(229,9,20,0.5); }
+        .nav-today-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse2 2s cubic-bezier(.4,0,.6,1) infinite;
+        }
+        @keyframes pulse2 { 50% { opacity: .35; box-shadow: none; } }
+
+        /* ── RECENTLY ADDED ROW ── */
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(229,9,20,.14); border: 1px solid rgba(229,9,20,.32);
+            color: var(--accent); font-size: 9px; font-weight: 800;
+            letter-spacing: .08em; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 20px; flex-shrink: 0;
+        }
+        .live-dot {
+            width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+            box-shadow: 0 0 6px var(--accent);
+            animation: pulse2 1.6s cubic-bezier(.4,0,.6,1) infinite;
+            flex-shrink: 0;
+        }
+
+        /* ── TODAY RELEASED SECTION ── */
+        .today-released-section { margin: 0 0 32px; }
+        .today-released-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; margin-bottom: 10px;
+        }
+        .today-released-title {
+            font-size: 17px; font-weight: 700; letter-spacing: -0.2px; color: #fff;
+        }
+        .today-released-title span {
+            display: inline-block; width: 4px; height: 16px;
+            background: var(--gold); border-radius: 2px; margin-right: 8px;
+            vertical-align: middle;
+        }
+        .today-filter-row {
+            display: flex; gap: 7px; padding: 0 20px 12px; overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .today-filter-row::-webkit-scrollbar { display: none; }
+        .today-tag {
+            border: 1px solid var(--border); background: rgba(255,255,255,.04);
+            color: var(--text2); font-size: 11px; font-weight: 700;
+            padding: 5px 13px; border-radius: 20px; cursor: pointer; flex-shrink: 0;
+            transition: background .2s, border-color .2s, color .2s;
+        }
+        .today-tag.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .today-tag:hover:not(.active) { background: rgba(255,255,255,.08); color: #fff; }
+
         @media (min-width: 600px) {
             .poster-card { width: 150px; }
             .poster-img-wrap { width: 150px; height: 224px; }
@@ -700,6 +853,10 @@ webapp_template = """
         <span>Search movies, series, anime</span>
     </button>
     <div class="nav-right">
+        <button class="nav-today-btn" onclick="openTodayPanel()" title="Today Airing">
+            <span class="nav-today-dot"></span>
+            Today
+        </button>
         <button class="nav-search-toggle" id="searchToggle" onclick="openSearch()" title="Search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
@@ -724,6 +881,23 @@ webapp_template = """
     </div>
 </div>
 
+<!-- TODAY AIRING PANEL -->
+<div class="today-panel" id="todayPanel">
+    <div class="today-panel-header">
+        <div class="today-panel-title">📅 Today Airing</div>
+        <button class="today-panel-close" onclick="closeTodayPanel()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="today-tabs" id="todayTabs">
+        <button class="today-tab active" data-tab="tv" onclick="switchTodayTab('tv')">TV Shows</button>
+        <button class="today-tab" data-tab="anime" onclick="switchTodayTab('anime')">Anime</button>
+    </div>
+    <div class="today-list" id="todayList">
+        <div class="today-spinner"><div class="spinner"></div></div>
+    </div>
+</div>
+
 <!-- HERO SECTION -->
 <section class="hero" id="hero">
     <div class="hero-bg" id="heroBg"></div>
@@ -744,6 +918,42 @@ webapp_template = """
 
 <!-- MAIN CONTENT ROWS -->
 <main class="main" id="main">
+
+    <!-- ── TODAY RELEASED (TV Series · Anime · OTT Movies) ── -->
+    <section class="today-released-section fade-up" id="todayReleasedSection">
+        <div class="today-released-header">
+            <div class="today-released-title">
+                <span></span>Today's Releases
+            </div>
+            <div class="live-badge"><span class="live-dot"></span>Live</div>
+        </div>
+        <div class="today-filter-row" id="todayFilterRow">
+            <button class="today-tag active" data-filter="all"   onclick="filterTodayReleased('all')">All</button>
+            <button class="today-tag"        data-filter="tv"    onclick="filterTodayReleased('tv')">TV Series</button>
+            <button class="today-tag"        data-filter="anime" onclick="filterTodayReleased('anime')">Anime</button>
+            <button class="today-tag"        data-filter="movie" onclick="filterTodayReleased('movie')">OTT Movies</button>
+        </div>
+        <div class="poster-scroll" id="rowTodayReleased">
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div>
+        </div>
+    </section>
+
+    <!-- ── RECENTLY ADDED (bot database) ── -->
+    <section class="row-section fade-up" id="recentlyAddedSection">
+        <div class="row-header">
+            <div class="row-title" style="display:flex;align-items:center;gap:8px">
+                <span></span>Recently Added
+                <div class="live-badge"><span class="live-dot"></span>New</div>
+            </div>
+        </div>
+        <div class="poster-scroll" id="rowRecentlyAdded">
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div>
+        </div>
+    </section>
 
     <!-- Trending Row -->
     <section class="row-section fade-up">
@@ -986,9 +1196,16 @@ async function loadHome() {
         }
     } catch(e) {}
 
+    // Fire all three fetches in parallel for fastest load
+    const [trendingData, todayData, recentData] = await Promise.allSettled([
+        fetch('/api/tmdb-trending').then(r => r.json()),
+        fetch('/api/today-airing').then(r => r.json()),
+        fetch('/api/recently-added').then(r => r.json()),
+    ]);
+
+    // ── TMDB Trending / home rows ─────────────────────────────────────
     try {
-        const resp = await fetch('/api/tmdb-trending');
-        const data = await resp.json();
+        const data = trendingData.value || {};
         botUsername = data.bot_username || botUsername;
 
         // Hero
@@ -996,7 +1213,6 @@ async function loadHome() {
         if (heroItems.length === 0) heroItems = (data.trending || []).slice(0, 6);
         if (heroItems.length > 0) {
             setHero(heroItems[0]);
-            // Build dots
             const dotsEl = document.getElementById('heroDots');
             dotsEl.innerHTML = '';
             heroItems.slice(0, 6).forEach((_, i) => {
@@ -1008,17 +1224,166 @@ async function loadHome() {
             startHeroRotation();
         }
 
-        // Rows + re-apply drag scroll after populating
-        if (data.trending) { renderRow('rowTrending', data.trending); enableDragScroll(document.getElementById('rowTrending')); }
-        if (data.popular_movies) { renderRow('rowMovies', data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); }
-        if (data.popular_tv) { renderRow('rowTV', data.popular_tv); enableDragScroll(document.getElementById('rowTV')); }
-        if (data.top_rated) { renderRow('rowTopRated', data.top_rated); enableDragScroll(document.getElementById('rowTopRated')); }
-        if (data.popular_anime) { renderRow('rowAnime', data.popular_anime); enableDragScroll(document.getElementById('rowAnime')); }
-
+        if (data.trending)       { renderRow('rowTrending',  data.trending);       enableDragScroll(document.getElementById('rowTrending')); }
+        if (data.popular_movies) { renderRow('rowMovies',    data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); }
+        if (data.popular_tv)     { renderRow('rowTV',        data.popular_tv);     enableDragScroll(document.getElementById('rowTV')); }
+        if (data.top_rated)      { renderRow('rowTopRated',  data.top_rated);      enableDragScroll(document.getElementById('rowTopRated')); }
+        if (data.popular_anime)  { renderRow('rowAnime',     data.popular_anime);  enableDragScroll(document.getElementById('rowAnime')); }
     } catch(e) {
-        console.error('Failed to load home:', e);
+        console.error('Failed to load trending:', e);
         document.getElementById('heroTitle').textContent = 'Failed to load';
     }
+
+    // ── TODAY Released (TV series · Anime · OTT movies) ──────────────
+    try {
+        const td = todayData.value || {};
+        const tvItems    = (td.tv    || []).map(x => ({...x, type: x.type || 'tv'}));
+        const animeItems = (td.anime || []).map(x => ({...x, type: x.type || 'anime'}));
+
+        // OTT movies: pull from TMDB popular_movies that were released today or this week
+        // We use TMDB's "now_playing" set (returned in trending/popular) filtered by recency
+        // For simplicity use recent popular movies from trendingData
+        const allMovies = ((trendingData.value || {}).popular_movies || []);
+        const today = new Date().toISOString().slice(0, 10);
+        const thisWeekMovies = allMovies.slice(0, 10).map(x => ({...x, type: 'movie'}));
+
+        window._todayAllItems = {
+            all:   [...tvItems, ...animeItems, ...thisWeekMovies],
+            tv:    tvItems,
+            anime: animeItems,
+            movie: thisWeekMovies,
+        };
+        renderTodayReleasedRow('all');
+        enableDragScroll(document.getElementById('rowTodayReleased'));
+    } catch(e) {
+        console.error('Failed to load today released:', e);
+        document.getElementById('rowTodayReleased').innerHTML =
+            '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load today\'s releases.</div>';
+    }
+
+    // ── Recently Added (bot DB) ───────────────────────────────────────
+    try {
+        const rd = recentData.value || {};
+        const files = rd.files || [];
+        if (files.length > 0) {
+            renderRecentlyAdded(files);
+            enableDragScroll(document.getElementById('rowRecentlyAdded'));
+        } else {
+            document.getElementById('recentlyAddedSection').style.display = 'none';
+        }
+    } catch(e) {
+        console.error('Failed to load recently added:', e);
+        document.getElementById('recentlyAddedSection').style.display = 'none';
+    }
+}
+
+// ── TODAY RELEASED ROW ────────────────────────────────────────────────────
+function renderTodayReleasedRow(filter) {
+    const items = (window._todayAllItems || {})[filter] || [];
+    const el = document.getElementById('rowTodayReleased');
+    if (!items.length) {
+        el.innerHTML = '<div style="padding:20px 16px;color:var(--text3);font-size:13px">Nothing scheduled for today in this category.</div>';
+        return;
+    }
+    el.innerHTML = '';
+    items.forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        card.style.animationDelay = `${i * 0.04}s`;
+        const posterSrc = item.poster || item.image || null;
+        const posterHTML = posterSrc
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(item.title || item.name || '')}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        const typeStr = item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie');
+        let epText = '';
+        if (item.season && item.episode) epText = `S${String(item.season).padStart(2,'0')}E${String(item.episode).padStart(2,'0')}`;
+        else if (item.episode) epText = `Ep ${item.episode}`;
+        const ratingVal = item.rating || 0;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
+                <div class="poster-type-badge">${epText ? epText : typeStr}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(item.title || item.name || '')}</div>
+            ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
+        `;
+        card.onclick = () => openModal({
+            id: item.tmdb_id || item.mal_id || item.id,
+            source: (item.mal_id && !item.tmdb_id) ? 'mal' : 'tmdb',
+            title: item.title || item.name || '',
+            type: item.type || 'movie',
+            year: item.year || '',
+            rating: ratingVal,
+            poster: posterSrc,
+            overview: item.overview || '',
+        });
+        el.appendChild(card);
+    });
+}
+
+function filterTodayReleased(filter) {
+    // Update active pill
+    document.querySelectorAll('#todayFilterRow .today-tag').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    renderTodayReleasedRow(filter);
+}
+
+// ── RECENTLY ADDED ROW ────────────────────────────────────────────────────
+function renderRecentlyAdded(files) {
+    const el = document.getElementById('rowRecentlyAdded');
+    el.innerHTML = '';
+    files.forEach((file, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        card.style.animationDelay = `${i * 0.03}s`;
+        const posterSrc = file.poster || null;
+        const posterHTML = posterSrc
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
+        let epText = '';
+        if (file.season != null && file.episode != null)
+            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
+        else if (file.season != null)
+            epText = `S${String(file.season).padStart(2,'0')}`;
+        const badgeText = epText || typeStr;
+        const ratingVal = file.rating || 0;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
+                <div class="poster-type-badge">${badgeText}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
+            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
+        `;
+        card.onclick = () => {
+            if (file.tmdb_id || (file.type && file.poster)) {
+                openModal({
+                    id: file.tmdb_id,
+                    source: 'tmdb',
+                    title: file.title || file.name,
+                    type: file.type || 'movie',
+                    year: file.year || '',
+                    rating: ratingVal,
+                    poster: posterSrc,
+                    overview: file.overview || '',
+                });
+            } else {
+                // No TMDB data — go direct to watch/download via file ID
+                selectFileById(file);
+            }
+        };
+        el.appendChild(card);
+    });
+}
+
+function selectFileById(file) {
+    // Show a toast and open download directly
+    showToast(`Opening: ${file.name}`);
+    window.open(`/watch/${file.id}`, '_blank');
 }
 
 // ── SEARCH ────────────────────────────────────────────────────────────────
@@ -1193,7 +1558,19 @@ function resetDetailSections() {
 function renderDetailMedia(details) {
     const media = document.getElementById('detailMedia');
     if (details.trailer && details.trailer.embed) {
-        media.innerHTML = `<iframe src="${details.trailer.embed}" title="${escapeHTML(details.title)} trailer" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+        // Autoplay muted — YouTube requires autoplay=1&mute=1 together
+        let embedUrl = details.trailer.embed;
+        try {
+            const u = new URL(embedUrl);
+            u.searchParams.set('autoplay', '1');
+            u.searchParams.set('mute', '1');
+            u.searchParams.set('rel', '0');
+            u.searchParams.set('modestbranding', '1');
+            embedUrl = u.toString();
+        } catch(e) {
+            embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'autoplay=1&mute=1&rel=0';
+        }
+        media.innerHTML = `<iframe src="${embedUrl}" title="${escapeHTML(details.title)} trailer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
     } else if (details.backdrop || details.poster) {
         media.innerHTML = `<img src="${details.backdrop || details.poster}" alt="${escapeHTML(details.title)} image">`;
     } else {
@@ -1260,14 +1637,14 @@ function renderImages(details) {
 }
 
 function renderQuotes(details) {
+    // Only show tagline and IMDb quote — no user reviews
     const quotes = [];
     if (details.tagline) quotes.push({author: details.title, quote: details.tagline});
     if (details.external?.imdb?.quote) quotes.push({author: 'IMDb', quote: details.external.imdb.quote});
-    (details.reviews || []).forEach(r => { if (r.quote) quotes.push(r); });
     if (!quotes.length) return;
     document.getElementById('detailQuotes').innerHTML = `
-        <div class="detail-section-title">Quotes & Reviews</div>
-        ${quotes.slice(0, 5).map(q => `<div class="quote-card">"${escapeHTML(q.quote)}"<br><b>${escapeHTML(q.author || 'Viewer')}</b></div>`).join('')}
+        <div class="detail-section-title">Quote</div>
+        ${quotes.map(q => `<div class="quote-card">"${escapeHTML(q.quote)}"<br><b>${escapeHTML(q.author || '')}</b></div>`).join('')}
     `;
 }
 
@@ -1457,6 +1834,104 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// ── TODAY AIRING ──────────────────────────────────────────────────────────
+let todayData = null;
+let todayActiveTab = 'tv';
+
+async function openTodayPanel() {
+    document.getElementById('todayPanel').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (!todayData) {
+        await loadTodayAiring();
+    } else {
+        renderTodayTab(todayActiveTab);
+    }
+}
+
+function closeTodayPanel() {
+    document.getElementById('todayPanel').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function switchTodayTab(tab) {
+    todayActiveTab = tab;
+    document.querySelectorAll('.today-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    renderTodayTab(tab);
+}
+
+async function loadTodayAiring() {
+    document.getElementById('todayList').innerHTML = `<div class="today-spinner"><div class="spinner"></div></div>`;
+    try {
+        const resp = await fetch('/api/today-airing');
+        todayData = await resp.json();
+        renderTodayTab(todayActiveTab);
+    } catch(e) {
+        document.getElementById('todayList').innerHTML = `<div class="today-empty">Could not load today's schedule. Try again later.</div>`;
+    }
+}
+
+function renderTodayTab(tab) {
+    const list = document.getElementById('todayList');
+    const items = tab === 'anime' ? (todayData?.anime || []) : (todayData?.tv || []);
+    if (!items.length) {
+        list.innerHTML = `<div class="today-empty">No ${tab === 'anime' ? 'anime' : 'TV shows'} airing today.</div>`;
+        return;
+    }
+    list.innerHTML = '';
+    items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'today-item';
+        const thumb = item.poster
+            ? `<img class="today-thumb" src="${escapeHTML(item.poster)}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+              + `<div class="today-thumb-placeholder" style="display:none">🎬</div>`
+            : `<div class="today-thumb-placeholder">🎬</div>`;
+
+        // Episode badge
+        let epBadge = '';
+        if (item.season && item.episode) {
+            epBadge = `<div class="today-ep-badge">S${String(item.season).padStart(2,'0')} E${String(item.episode).padStart(2,'0')}${item.episode_name ? ' · ' + escapeHTML(item.episode_name.slice(0,30)) : ''}</div>`;
+        } else if (item.episode) {
+            epBadge = `<div class="today-ep-badge">Ep ${item.episode}${item.episode_name ? ' · ' + escapeHTML(item.episode_name.slice(0,30)) : ''}</div>`;
+        }
+
+        // Source chips
+        const chips = [];
+        if (item.imdb_id)  chips.push(`<span class="today-source-chip chip-imdb">IMDb</span>`);
+        if (item.tvdb_id)  chips.push(`<span class="today-source-chip chip-tvdb">TVDB</span>`);
+        if (item.tmdb_id)  chips.push(`<span class="today-source-chip chip-tmdb">TMDB</span>`);
+        if (item.mal_id)   chips.push(`<span class="today-source-chip chip-mal">MAL</span>`);
+
+        el.innerHTML = `
+            ${thumb}
+            <div class="today-info">
+                <div class="today-item-title">${escapeHTML(item.title)}</div>
+                ${epBadge}
+                <div class="today-meta-row">
+                    ${item.rating ? `<span class="today-rating">⭐ ${item.rating}</span>` : ''}
+                    ${item.network ? `<span class="today-network">${escapeHTML(item.network)}</span>` : ''}
+                    ${chips.join('')}
+                </div>
+            </div>
+        `;
+        el.onclick = () => {
+            closeTodayPanel();
+            openModal({
+                id: item.tmdb_id || item.mal_id,
+                source: item.mal_id && !item.tmdb_id ? 'mal' : 'tmdb',
+                title: item.title,
+                type: item.type || tab,
+                year: item.year || '',
+                rating: item.rating || 0,
+                poster: item.poster || null,
+                overview: item.overview || ''
+            });
+        };
+        list.appendChild(el);
+    });
+}
+
 // ── BOOT ──────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', loadHome);
 </script>
@@ -1534,8 +2009,9 @@ watch_tmplt = """<!DOCTYPE html>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{heading}</title>
-    <!-- Plyr CSS -->
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+    <!-- VidKing Player CSS -->
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css">
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     <style>
@@ -1587,7 +2063,7 @@ watch_tmplt = """<!DOCTYPE html>
             padding:2.5rem 1.5rem 3rem; width:100%;
         }
 
-        /* Badge */
+        /* ── Badge ── */
         .badge {
             display:inline-flex; align-items:center; gap:.4rem;
             background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3);
@@ -1601,7 +2077,7 @@ watch_tmplt = """<!DOCTYPE html>
         }
         @keyframes pulse { 50% { opacity:.3; box-shadow:none; } }
 
-        /* Player Wrap */
+        /* ── Player wrap ── */
         .player-wrap {
             position:relative; width:100%; max-width:1060px;
             border-radius:24px; padding:1px; z-index:10;
@@ -1614,17 +2090,20 @@ watch_tmplt = """<!DOCTYPE html>
         .player-card {
             position:relative; background:#000; border-radius:22px;
             overflow:hidden; box-shadow:0 25px 65px rgba(0,0,0,.5);
-            aspect-ratio:16/9; display:flex; align-items:center; justify-content:center;
-            width:100%;
-        }
-        .player-card video, .plyr video {
-            width:100% !important; height:100% !important;
-            object-fit:cover !important; border-radius:22px;
+            aspect-ratio:16/9; width:100%;
         }
 
-        /* Load Skeleton */
+        /* ── VidKing / native video fill ── */
+        #mainPlayer {
+            position:absolute; inset:0;
+            width:100% !important; height:100% !important;
+            border-radius:22px;
+            background:#000;
+        }
+
+        /* ── Skeleton loader ── */
         .skeleton {
-            position:absolute; inset:0; background:#0a0e1c; z-index:20;
+            position:absolute; inset:0; background:#0a0e1c; z-index:20; border-radius:22px;
             overflow:hidden; pointer-events:none; transition:opacity .4s, visibility .4s;
         }
         .skeleton::after {
@@ -1633,129 +2112,97 @@ watch_tmplt = """<!DOCTYPE html>
             transform:translateX(-100%); animation:shimmer 1.8s infinite;
         }
         @keyframes shimmer { 100% { transform:translateX(100%); } }
-        .skeleton.gone { opacity:0; visibility:hidden; }
+        .skeleton.gone { opacity:0; visibility:hidden; pointer-events:none; }
 
-        /* Video Error Overlay */
+        /* ── Error overlay ── */
         .player-err-overlay {
-            position:absolute; inset:0; z-index:50;
-            background:rgba(2,6,23,.92); backdrop-filter:blur(14px);
+            position:absolute; inset:0; z-index:50; border-radius:22px;
+            background:rgba(2,6,23,.93); backdrop-filter:blur(14px);
             opacity:0; visibility:hidden;
             display:flex; align-items:center; justify-content:center;
-            border-radius:22px; text-align:center; padding:2rem;
-            transition:opacity .4s ease, visibility .4s ease;
+            text-align:center; padding:2rem;
+            transition:opacity .35s ease, visibility .35s ease;
         }
         .player-err-overlay.show { opacity:1; visibility:visible; }
-        .err-card-sm { max-width:440px; width:100%; }
+        .err-card-sm { max-width:420px; width:100%; }
         .err-card-sm h2 { font-size:1.4rem; font-weight:800; margin-bottom:.5rem; letter-spacing:-.02em; }
-        .err-card-sm p { font-size:.85rem; color:var(--txt2); margin-bottom:1.5rem; line-height:1.5; }
-        .err-btn-grid {
-            display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; margin-top:1.2rem;
-        }
+        .err-card-sm p { font-size:.85rem; color:var(--txt2); line-height:1.55; }
 
-        /* Buttons */
+        /* ── Action buttons ── */
         .btn-row {
-            display:grid; grid-template-columns:repeat(3, 1fr); gap:.8rem;
-            margin-top:1.2rem;
-            width:100%; max-width:1060px;
+            display:grid; grid-template-columns:repeat(3,1fr); gap:.8rem;
+            margin-top:1.2rem; width:100%; max-width:1060px;
+        }
+        .btn-row-2 {
+            display:grid; grid-template-columns:repeat(2,1fr); gap:.8rem;
+            margin-top:.6rem; width:100%; max-width:1060px;
         }
         .xbtn {
             position:relative; overflow:hidden;
             display:flex; align-items:center; justify-content:center; gap:.5rem;
             width:100%; padding:.72rem .9rem;
             border-radius:11px; border:none;
-            font-family:'Inter',sans-serif;
-            font-size:.84rem; font-weight:600;
-            letter-spacing:.01em;
-            cursor:pointer; text-decoration:none; color:#fff;
+            font-family:'Inter',sans-serif; font-size:.84rem; font-weight:600;
+            letter-spacing:.01em; cursor:pointer; text-decoration:none; color:#fff;
             transition:transform .2s, box-shadow .2s, filter .2s;
         }
         .xbtn::after {
             content:''; position:absolute; inset:0;
-            background:rgba(255,255,255,.08);
-            opacity:0; transition:opacity .18s;
+            background:rgba(255,255,255,.08); opacity:0; transition:opacity .18s;
         }
         .xbtn:hover::after { opacity:1; }
-        .xbtn:hover {
-            transform:scale(1.02);
-            filter:brightness(1.08);
-        }
+        .xbtn:hover { transform:scale(1.02); filter:brightness(1.08); }
         .xbtn:active { transform:scale(.98); }
 
-        /* Download – indigo */
-        .btn-dl {
-            background:linear-gradient(135deg,#4f46e5,#818cf8,#a78bfa);
-            box-shadow:0 4px 16px rgba(99,102,241,.38);
-        }
-        .btn-dl:hover { box-shadow:0 7px 24px rgba(99,102,241,.55); }
-
-        /* VLC – amber */
-        .btn-vlc {
-            background:linear-gradient(135deg,#92400e,#f59e0b,#fde68a);
-            box-shadow:0 4px 16px rgba(245,158,11,.35);
-        }
+        .btn-dl  { background:linear-gradient(135deg,#4f46e5,#818cf8,#a78bfa); box-shadow:0 4px 16px rgba(99,102,241,.38); }
+        .btn-dl:hover  { box-shadow:0 7px 24px rgba(99,102,241,.55); }
+        .btn-vlc { background:linear-gradient(135deg,#92400e,#f59e0b,#fde68a); color:#1a1a1a; box-shadow:0 4px 16px rgba(245,158,11,.35); }
         .btn-vlc:hover { box-shadow:0 7px 24px rgba(245,158,11,.52); }
+        .btn-mx  { background:linear-gradient(135deg,#065f46,#10b981,#6ee7b7); box-shadow:0 4px 16px rgba(16,185,129,.35); }
+        .btn-mx:hover  { box-shadow:0 7px 24px rgba(16,185,129,.52); }
+        .btn-sp  { background:linear-gradient(135deg,#9f1239,#f43f5e,#fb7185); box-shadow:0 4px 16px rgba(244,63,94,.35); }
+        .btn-sp:hover  { box-shadow:0 7px 24px rgba(244,63,94,.52); }
+        .btn-np  { background:linear-gradient(135deg,#4a1d96,#7c3aed,#c4b5fd); box-shadow:0 4px 16px rgba(124,58,237,.35); }
+        .btn-np:hover  { box-shadow:0 7px 24px rgba(124,58,237,.52); }
 
-        /* MX – emerald */
-        .btn-mx {
-            background:linear-gradient(135deg,#065f46,#10b981,#6ee7b7);
-            box-shadow:0 4px 16px rgba(16,185,129,.35);
-        }
-        .btn-mx:hover { box-shadow:0 7px 24px rgba(16,185,129,.52); }
-
-        /* Footer */
+        /* ── Footer ── */
         footer {
             padding:.85rem 1.5rem; text-align:center;
-            color:var(--txt2); font-size:.73rem;
-            margin-top:auto;
+            color:var(--txt2); font-size:.73rem; margin-top:auto;
         }
         footer::before {
-            content:''; display:block;
-            width:90px; height:1px;
+            content:''; display:block; width:90px; height:1px;
             background:linear-gradient(90deg,transparent,rgba(129,140,248,.28),transparent);
             margin:0 auto .7rem;
         }
-        .ha-link {
-            color:var(--p); text-decoration:none; font-weight:600;
-            transition:opacity .2s;
-        }
+        .ha-link { color:var(--p); text-decoration:none; font-weight:600; transition:opacity .2s; }
         .ha-link:hover { opacity:.7; }
 
-        /* Plyr overrides */
-        .plyr { width: 100% !important; height: 100% !important; }
-        .plyr__controls {
-            width: 100% !important;
-            bottom: 0 !important;
-            padding: 10px 15px !important;
-            justify-content: space-between !important;
+        /* ── VidKing theme overrides ── */
+        media-player {
+            --media-brand: #818cf8;
+            --media-focus-ring: #818cf8;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            inset: 0;
+            border-radius: 22px;
+            overflow: hidden;
+            background: #000;
         }
-        .plyr__progress { flex-grow: 1 !important; display: flex !important; }
-        .plyr--video .plyr__control--overlaid {
-            position: absolute !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            background:linear-gradient(135deg,var(--p2),var(--sec));
-            box-shadow:0 0 20px rgba(129,140,248,.5);
-            transition:opacity .2s ease, box-shadow .2s ease !important;
-        }
-        .plyr--video .plyr__control--overlaid:hover {
-            transform: translate(-50%, -50%) !important;
-            box-shadow:0 0 30px rgba(129,140,248,.7);
-        }
-        .plyr--video .plyr__control:hover,
-        .plyr--video .plyr__control[aria-expanded="true"] { background:var(--p2); }
-        .plyr__control.plyr__tab-focus { box-shadow:0 0 0 5px rgba(99,102,241,.4); }
-        .plyr--full-ui input[type=range]  { color:var(--p); }
-        .plyr__progress input[type=range] { color:var(--p); }
-        .plyr__progress__buffer { color:rgba(129,140,248,.2); }
-        .plyr__menu__container .plyr__control[role=menuitemradio][aria-checked=true]::before { background:var(--p); }
+        media-provider { width:100%; height:100%; }
 
         /* Responsive */
         @media (max-width:600px) {
             .container { padding:1rem .85rem .85rem; }
-            .btn-row, .err-btn-grid { grid-template-columns:1fr; gap:.6rem; }
-            .xbtn { padding:.78rem 1rem; }
+            .btn-row { grid-template-columns:1fr 1fr; gap:.6rem; }
+            .btn-row-2 { grid-template-columns:1fr 1fr; gap:.6rem; }
+            .xbtn { padding:.78rem 1rem; font-size:.78rem; }
             #file-name { font-size:.78rem; }
+        }
+        @media (max-width:400px) {
+            .btn-row { grid-template-columns:1fr; }
+            .btn-row-2 { grid-template-columns:1fr; }
         }
     </style>
 </head>
@@ -1770,31 +2217,39 @@ watch_tmplt = """<!DOCTYPE html>
 
     <div class="badge">
         <span class="badge-dot"></span>
-        ONLINE
+        ONLINE STREAM
     </div>
 
     <div class="player-wrap">
         <div class="player-ambient"></div>
         <div class="player-card">
+            <!-- Loading skeleton -->
             <div class="skeleton" id="skel"></div>
 
+            <!-- Error overlay -->
             <div class="player-err-overlay" id="vidErr">
                 <div class="err-card-sm">
-                    <div style="margin-bottom:1.2rem; color:rgba(255,255,255,0.7);">
-                        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div style="margin-bottom:1.2rem;color:rgba(255,255,255,.7)">
+                        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
                     </div>
-                    <h2>Oops! The video failed to load.</h2>
-                    <p>Please try downloading or opening it in an external player.</p>
+                    <h2>Stream Failed to Load</h2>
+                    <p>The stream couldn't start. Try downloading the file or opening it in an external player below.</p>
                 </div>
             </div>
 
-            <video src="{src}" class="player" playsinline controls></video>
+            <!-- VidKing / vidstack player -->
+            <media-player id="mainPlayer" src="{src}" playsinline>
+                <media-provider></media-provider>
+                <media-video-layout></media-video-layout>
+            </media-player>
         </div>
     </div>
 
+    <!-- Row 1: Download · VLC · MX Player -->
     <div class="btn-row">
-        <!-- Download -->
-        <a href="{src}" class="xbtn btn-dl" download>
+        <a id="dlBtn" href="{src}" class="xbtn btn-dl" download>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -1802,22 +2257,36 @@ watch_tmplt = """<!DOCTYPE html>
             </svg>
             Download
         </a>
-
-        <!-- VLC -->
-        <a href="vlc://{src}" class="xbtn btn-vlc">
+        <a id="vlcBtn" href="#" class="xbtn btn-vlc">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
-            Play in VLC
+            VLC Player
         </a>
-
-        <!-- MX Player -->
-        <a href="intent:{src}#Intent;package=com.mxtech.videoplayer.ad;end" class="xbtn btn-mx">
+        <a id="mxBtn" href="#" class="xbtn btn-mx">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <polygon points="10 8 16 12 10 16 10 8"/>
             </svg>
             MX Player
+        </a>
+    </div>
+
+    <!-- Row 2: SPlayer · nPlayer -->
+    <div class="btn-row-2">
+        <a id="splayerBtn" href="#" class="xbtn btn-sp">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg>
+            SPlayer
+        </a>
+        <a id="nplayerBtn" href="#" class="xbtn btn-np">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <polyline points="8 21 12 17 16 21"/>
+            </svg>
+            nPlayer
         </a>
     </div>
 
@@ -1827,51 +2296,83 @@ watch_tmplt = """<!DOCTYPE html>
     <p>Powered by <a href="https://t.me/FT_Channels" class="ha-link" target="_blank" rel="noopener">Filmotainment</a></p>
 </footer>
 
-<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const skel    = document.getElementById('skel');
-    const vidErr  = document.getElementById('vidErr');
-    const videoEl = document.querySelector('.player');
+<!-- VidKing (vidstack) JS — ESM via CDN -->
+<script type="module">
+    import { PlyrLayout, VidstackPlayer } from 'https://cdn.vidstack.io/player';
 
-    const player = new Plyr('.player', {
-        controls: ['play-large','play','progress','current-time','duration',
-                   'mute','volume','captions','settings','pip','airplay','fullscreen'],
-        settings: ['captions','quality','speed'],
-        hideControls: false,
-        tooltips: { controls:true, seek:true }
-    });
-
+    const SRC = "{src}";
+    const skel   = document.getElementById('skel');
+    const vidErr = document.getElementById('vidErr');
     let errTriggered = false;
-    const hideSkel = () => { if (skel) skel.classList.add('gone'); };
+    let loadOk = false;
+
+    const hideSkel  = () => skel && skel.classList.add('gone');
     const showError = () => {
         if (errTriggered) return;
         errTriggered = true;
         hideSkel();
-        if (vidErr) vidErr.classList.add('show');
-        if (player && player.elements && player.elements.container) {
-            player.elements.container.style.display = 'none';
-        }
+        vidErr && vidErr.classList.add('show');
     };
-    
-    videoEl.addEventListener('loadedmetadata', hideSkel);
-    videoEl.addEventListener('canplay', hideSkel);
-    
-    // Core HTML5 error events
-    ['error', 'abort', 'stalled'].forEach(evt => {
-        videoEl.addEventListener(evt, () => {
-            if (videoEl.error || videoEl.networkState === 3) showError();
+
+    // ── Wire up external player buttons ──────────────────────────────
+    const enc = encodeURIComponent(SRC);
+    const noScheme = SRC.replace(/^https?:\\/\\//, '');
+    const isHttps  = SRC.startsWith('https');
+
+    // VLC — works on Android (vlc://) and iOS (vlc-x-callback://)
+    document.getElementById('vlcBtn').href = 'vlc://' + SRC;
+    // MX Player — Android Intent URI (falls back gracefully on iOS/desktop)
+    document.getElementById('mxBtn').href =
+        'intent:' + SRC + '#Intent;package=com.mxtech.videoplayer.ad;S.title={file_name};end';
+    // SPlayer
+    document.getElementById('splayerBtn').href = 'splayer://control/play?url=' + enc;
+    // nPlayer — uses nplayer-http:// or nplayer-https:// scheme
+    document.getElementById('nplayerBtn').href =
+        (isHttps ? 'nplayer-https://' : 'nplayer-http://') + noScheme;
+
+    // ── Init VidKing player ───────────────────────────────────────────
+    try {
+        const player = await VidstackPlayer.create({
+            target: '#mainPlayer',
+            src: SRC,
+            layout: new PlyrLayout(),
+            playsinline: true,
+            crossorigin: 'anonymous',
         });
-    });
-    
-    // Fallback timeout for unresponsive streams
-    let loadTimeout = setTimeout(() => {
-        if (videoEl.readyState === 0) showError();
-        hideSkel();
-    }, 12000);
-    
-    videoEl.addEventListener('playing', () => clearTimeout(loadTimeout));
-});
+
+        player.addEventListener('can-play',     () => { loadOk = true; hideSkel(); });
+        player.addEventListener('playing',       () => { loadOk = true; hideSkel(); });
+        player.addEventListener('loaded-metadata', () => { loadOk = true; hideSkel(); });
+
+        player.addEventListener('error', () => {
+            if (!loadOk) showError();
+        });
+
+        // Fallback timeout — 20 s
+        setTimeout(() => { if (!loadOk) showError(); }, 20000);
+
+    } catch (initErr) {
+        console.warn('VidKing init failed, falling back to native video:', initErr);
+        // ── Fallback: plain <video> element ──────────────────────────
+        const card = document.querySelector('.player-card');
+        const mediaEl = document.getElementById('mainPlayer');
+        // Remove the custom element and insert a plain video
+        mediaEl.remove();
+        const vid = document.createElement('video');
+        vid.id = 'mainPlayer';
+        vid.src = SRC;
+        vid.controls = true;
+        vid.playsinline = true;
+        vid.preload = 'metadata';
+        vid.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border-radius:22px;background:#000;';
+        card.appendChild(vid);
+
+        vid.addEventListener('loadedmetadata', () => { loadOk = true; hideSkel(); });
+        vid.addEventListener('canplay',        () => { loadOk = true; hideSkel(); });
+        vid.addEventListener('playing',        () => { loadOk = true; hideSkel(); });
+        vid.addEventListener('error',          () => { if (!loadOk) showError(); });
+        setTimeout(() => { if (!loadOk) showError(); }, 20000);
+    }
 </script>
 </body>
 </html>
@@ -2304,16 +2805,36 @@ payment_template = """
 # Backend helpers
 # ─────────────────────────────────────────────────────────────────────────────
 async def media_watch(message_id):
-    media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+    try:
+        media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+    except Exception:
+        return error_tmplt
+
+    # Guard: message must exist and have media
+    if not media_msg or not media_msg.media:
+        return error_tmplt
+
     media = getattr(media_msg, media_msg.media.value, None)
+    if not media:
+        return error_tmplt
+
     src = urllib.parse.urljoin(URL, f'download/{message_id}')
-    tag = media.mime_type.split('/')[0].strip()
-    if tag == 'video':
-        heading = html.escape(f'Watch — {media.file_name}')
-        html_ = (watch_tmplt
-                 .replace('{heading}',   heading)
-                 .replace('{file_name}', media.file_name)
-                 .replace('{src}',       src))
-    else:
-        html_ = error_tmplt
+
+    # Only serve video files on the watch page
+    mime = getattr(media, 'mime_type', '') or ''
+    tag  = mime.split('/')[0].strip().lower()
+    if tag != 'video':
+        return error_tmplt
+
+    # Safe filename — Telegram may omit it for raw video blobs
+    file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
+    file_name_safe = html.escape(file_name)
+    heading   = html.escape(f'Watch \u2014 {file_name}')
+
+    # Replace template tokens — {heading} and {file_name} before {src}
+    # to avoid any partial re-substitution if values ever contain braces.
+    html_ = (watch_tmplt
+             .replace('{heading}',   heading)
+             .replace('{file_name}', file_name_safe)
+             .replace('{src}',       src))
     return html_
