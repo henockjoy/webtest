@@ -417,6 +417,43 @@ async def stream_file_handler(request):
     except Exception as e:
         return web.Response(text=error_tmplt, content_type='text/html')
 
+
+@routes.get("/api/tracks/{message_id}")
+async def tracks_handler(request):
+    """Use ffprobe to extract audio and subtitle track info from the stream URL."""
+    import asyncio, subprocess, json as _json, urllib.parse as _up
+    try:
+        message_id = int(request.match_info['message_id'])
+        stream_url = _up.urljoin(URL, f"download/{message_id}")
+
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-select_streams", "a:s",
+            stream_url,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+
+        data = _json.loads(stdout.decode()) if stdout else {}
+        streams = data.get("streams", [])
+
+        audio = []
+        subs  = []
+        for i, s in enumerate(streams):
+            codec_type = s.get("codec_type", "")
+            tags = s.get("tags", {})
+            label = tags.get("title") or tags.get("language") or s.get("codec_name", "")
+            lang  = tags.get("language", "")
+            idx   = s.get("index", i)
+            if codec_type == "audio":
+                audio.append({"index": idx, "label": label or f"Audio {len(audio)+1}", "language": lang})
+            elif codec_type == "subtitle":
+                subs.append({"index": idx, "label": label or f"Sub {len(subs)+1}", "language": lang})
+
+        return web.json_response({"audio": audio, "subtitles": subs})
+    except Exception as e:
+        return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
+
 @routes.get("/", allow_head=True)
 async def webapp_route_handler(request):
     if not TMDB_API_KEY:
