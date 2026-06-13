@@ -18,6 +18,27 @@ from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
 from web.utils.render_template import media_watch, error_tmplt, watch_tmplt, webapp_template, payment_template, no_tmdb_template
 from database.ia_filterdb import get_search_results
 from database.users_chats_db import db
+
+# Cache for BIN_CHANNEL messages to avoid repeated get_messages() calls on every range request
+import time as _time
+_MSG_CACHE = {}          # {message_id: (media_msg, timestamp)}
+_MSG_CACHE_TTL = 300     # seconds — 5 minutes
+
+async def _get_cached_message(message_id: int):
+    """Return cached message or fetch from Telegram and cache it."""
+    entry = _MSG_CACHE.get(message_id)
+    if entry:
+        msg, ts = entry
+        if _time.monotonic() - ts < _MSG_CACHE_TTL:
+            return msg
+    msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+    if msg and msg.media:
+        _MSG_CACHE[message_id] = (msg, _time.monotonic())
+        # Keep cache small — evict oldest entries over 200
+        if len(_MSG_CACHE) > 200:
+            oldest = min(_MSG_CACHE, key=lambda k: _MSG_CACHE[k][1])
+            del _MSG_CACHE[oldest]
+    return msg
 import json, io, aiohttp
 import re
 import PTN
@@ -1230,7 +1251,7 @@ async def today_airing_handler(request):
 
 async def media_download(request, message_id: int):
     range_header = request.headers.get('Range', '')
-    media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+    media_msg = await _get_cached_message(message_id)
 
     # Guard: message must exist and carry media
     if not media_msg or not media_msg.media:
