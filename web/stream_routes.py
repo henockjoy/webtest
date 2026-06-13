@@ -709,8 +709,10 @@ async def repair_status_handler(request):
 
 @routes.get("/api/recently-added")
 async def recently_added_handler(request):
-    """Returns the 30 most recently indexed files from the bot's database,
-    enriched with TMDB/MAL data where available for poster images."""
+    """Returns the most recently indexed files from the bot's database,
+    enriched with the same TMDB/MAL matching logic used everywhere else.
+    Each result carries source, type, tmdb_id/mal_id so the frontend modal
+    can open the correct detail page with proper file matching."""
     limit = min(int(request.query.get("limit", 30)), 60)
     try:
         from database.ia_filterdb import collection, second_collection, SECOND_FILES_DATABASE_URL
@@ -725,6 +727,7 @@ async def recently_added_handler(request):
             docs2 = await cursor2.to_list(length=remaining)
             results.extend(docs2)
 
+        # Build file models — same as used in /api/search
         files = []
         for doc in results:
             model = file_model(doc)
@@ -738,43 +741,166 @@ async def recently_added_handler(request):
                 "episode": model.get("episode"),
             })
 
-        # Enrich with TMDB poster/backdrop if API key available (best-effort, fast)
-        enriched = []
-        if TMDB_API_KEY and files:
-            async with aiohttp.ClientSession() as session:
-                # Batch: pick unique titles (up to 20) to avoid too many API calls
-                seen_titles = set()
-                title_meta = {}
-                for f in files:
-                    t = (f["title"] or "").strip().lower()
-                    if t and t not in seen_titles and len(seen_titles) < 20:
-                        seen_titles.add(t)
-                        data = await fetch_json(
-                            session,
-                            f"{TMDB_BASE}/search/multi",
-                            params={"api_key": TMDB_API_KEY, "query": f["title"], "page": "1"}
-                        )
-                        best = next((r for r in data.get("results", [])
-                                     if r.get("media_type") in ("movie", "tv")
-                                     and r.get("poster_path")), None)
-                        if best:
-                            mt = best.get("media_type", "movie")
-                            title_meta[t] = {
-                                "poster": tmdb_img(best.get("poster_path"), "w342"),
-                                "backdrop": tmdb_img(best.get("backdrop_path"), "w780"),
-                                "rating": round(best.get("vote_average") or 0, 1),
-                                "type": mt,
-                                "overview": best.get("overview") or "",
-                                "tmdb_id": best.get("id"),
-                            }
+        if not files:
+            return web.json_response({"files": []})
 
-                for f in files:
-                    t = (f["title"] or "").strip().lower()
-                    meta = title_meta.get(t, {})
-                    enriched.append({**f, **meta})
+        # ── Deduplicate by title so we don't make the same API call twice ──
+        # Build a lookup: normalised_title → list of file IDs that share it
+        title_to_files = {}
+        for f in files:
+            key = normalize_title(f["title"] or "")
+            if not key:
+                key = normalize_title(f["name"] or "")
+            title_to_files.setdefault(key, []).append(f)
+
+        # ── Enrich each unique title via TMDB + MAL (same logic as tmdb-search) ──
+        title_meta = {}  # norm_title → enriched meta dict
+
+        if TMDB_API_KEY:
+            async with aiohttp.ClientSession() as session:
+                for norm_title, group in title_to_files.items():
+                    # Use the raw title from the first file in the group
+                    raw_title = group[0]["title"] or group[0]["name"]
+                    year = group[0].get("year")
+                    has_season = any(f.get("season") is not None for f in group)
+
+                    # ── 1. Search TMDB (movie + tv) ──
+                    tmdb_data = await fetch_json(
+                        session,
+                        f"{TMDB_BASE}/search/multi",
+                        params={"api_key": TMDB_API_KEY, "query": raw_title, "page": "1", "include_adult": "true"}
+                    )
+                    tmdb_results = [
+                        r for r in tmdb_data.get("results", [])
+                        if r.get("media_type") in ("movie", "tv")
+                    ]
+
+                    # ── 2. Search MAL/Jikan (anime) ──
+                    mal_data = await fetch_json(
+                        session,
+                        f"{JIKAN_BASE}/anime",
+                        params={"q": raw_title, "limit": 5, "sfw": "false"}
+                    )
+                    mal_results = mal_data.get("data", [])
+
+                    # ── 3. Score TMDB candidates with same fuzzy logic as match_file_to_tmdb ──
+                    best_tmdb = None
+                    best_tmdb_score = 0.0
+                    for r in tmdb_results:
+                        mt = r.get("media_type", "movie")
+                        candidate_title = r.get("title") or r.get("name", "")
+                        candidate_year = (r.get("release_date") or r.get("first_air_date") or "")[:4]
+                        score = fuzzy_ratio(normalize_title(raw_title), normalize_title(candidate_title))
+                        if score < 0.55:
+                            continue
+                        # Boost for year match
+                        if year and candidate_year and str(year) == candidate_year:
+                            score += 0.08
+                        # Boost for tv type when file has season info
+                        if mt == "tv" and has_season:
+                            score += 0.05
+                        # Boost for movie type when file has no season
+                        if mt == "movie" and not has_season:
+                            score += 0.03
+                        if score > best_tmdb_score:
+                            best_tmdb_score = score
+                            best_tmdb = r
+
+                    # ── 4. Score MAL candidates ──
+                    best_mal = None
+                    best_mal_score = 0.0
+                    for anime in mal_results:
+                        candidate_title = anime.get("title_english") or anime.get("title") or ""
+                        score = fuzzy_ratio(normalize_title(raw_title), normalize_title(candidate_title))
+                        if score < 0.55:
+                            continue
+                        anime_year = str(anime.get("year") or "")
+                        if year and anime_year and str(year) == anime_year:
+                            score += 0.08
+                        if has_season:
+                            score += 0.04
+                        if score > best_mal_score:
+                            best_mal_score = score
+                            best_mal = anime
+
+                    # ── 5. Pick the best match across TMDB and MAL ──
+                    meta = {"poster": None, "backdrop": None, "rating": 0,
+                            "type": "movie", "overview": "",
+                            "tmdb_id": None, "mal_id": None, "source": "tmdb"}
+
+                    if best_tmdb and (best_tmdb_score >= best_mal_score or best_mal is None):
+                        mt = best_tmdb.get("media_type", "movie")
+                        meta.update({
+                            "source": "tmdb",
+                            "type": mt,
+                            "tmdb_id": best_tmdb.get("id"),
+                            "mal_id": None,
+                            "poster": tmdb_img(best_tmdb.get("poster_path"), "w342"),
+                            "backdrop": tmdb_img(best_tmdb.get("backdrop_path"), "w780"),
+                            "rating": round(best_tmdb.get("vote_average") or 0, 1),
+                            "overview": best_tmdb.get("overview") or "",
+                            "title": best_tmdb.get("title") or best_tmdb.get("name") or raw_title,
+                            "year": (best_tmdb.get("release_date") or best_tmdb.get("first_air_date") or "")[:4] or year,
+                        })
+                    elif best_mal:
+                        images = best_mal.get("images", {}).get("jpg", {})
+                        poster_url = images.get("large_image_url") or images.get("image_url")
+                        mal_year = str(best_mal.get("year") or "")
+                        meta.update({
+                            "source": "mal",
+                            "type": "anime",
+                            "tmdb_id": None,
+                            "mal_id": best_mal.get("mal_id"),
+                            "poster": poster_url,
+                            "backdrop": poster_url,
+                            "rating": round(best_mal.get("score") or 0, 1),
+                            "overview": best_mal.get("synopsis") or "",
+                            "title": best_mal.get("title_english") or best_mal.get("title") or raw_title,
+                            "year": mal_year or year,
+                        })
+
+                    title_meta[norm_title] = meta
         else:
-            enriched = [dict(f, poster=None, backdrop=None, rating=0,
-                             type="movie", overview="", tmdb_id=None) for f in files]
+            # No TMDB key — return bare file data, type inferred from season presence
+            for norm_title, group in title_to_files.items():
+                has_season = any(f.get("season") is not None for f in group)
+                title_meta[norm_title] = {
+                    "poster": None, "backdrop": None, "rating": 0,
+                    "type": "tv" if has_season else "movie",
+                    "overview": "", "tmdb_id": None, "mal_id": None, "source": "tmdb"
+                }
+
+        # ── Merge meta back onto every file ──
+        enriched = []
+        for f in files:
+            norm = normalize_title(f["title"] or "")
+            if not norm:
+                norm = normalize_title(f["name"] or "")
+            meta = title_meta.get(norm, {
+                "poster": None, "backdrop": None, "rating": 0,
+                "type": "movie", "overview": "", "tmdb_id": None, "mal_id": None, "source": "tmdb"
+            })
+            # Merge: file fields take precedence for id/name/size/season/episode;
+            # meta supplies poster/backdrop/rating/type/overview/tmdb_id/mal_id/source/title/year
+            enriched.append({
+                # file identity
+                "id": f["id"],
+                "name": f["name"],
+                "size": f["size"],
+                "season": f.get("season"),
+                "episode": f.get("episode"),
+                # from meta (TMDB/MAL matched)
+                "title": meta.get("title") or f["title"] or f["name"],
+                "year": meta.get("year") or f.get("year"),
+                "type": meta.get("type", "movie"),
+                "source": meta.get("source", "tmdb"),
+                "tmdb_id": meta.get("tmdb_id"),
+                "mal_id": meta.get("mal_id"),
+                "poster": meta.get("poster"),
+                "backdrop": meta.get("backdrop"),
+                "rating": meta.get("rating", 0),
+                "overview": meta.get("overview", ""),
+            })
 
         return web.json_response({"files": enriched})
     except Exception as e:
@@ -943,8 +1069,21 @@ async def media_download(request, message_id: int):
 
     file_name = media.file_name if media.file_name \
         else f"{secrets.token_hex(2)}.mp4"
-    mime_type = media.mime_type if media.mime_type \
-        else mimetypes.guess_type(file_name)[0] or 'video/mp4'
+
+    # Resolve mime — Telegram often sends MKV/AVI as application/octet-stream
+    mime_type = media.mime_type if (media.mime_type and media.mime_type != 'application/octet-stream') \
+        else mimetypes.guess_type(file_name)[0]
+    if not mime_type:
+        ext = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
+        mime_map = {
+            'mkv': 'video/x-matroska', 'avi': 'video/x-msvideo',
+            'mov': 'video/quicktime',  'wmv': 'video/x-ms-wmv',
+            'flv': 'video/x-flv',     'webm': 'video/webm',
+            'm4v': 'video/x-m4v',     'ts': 'video/mp2t',
+            'mpeg': 'video/mpeg',      'mpg': 'video/mpeg',
+            '3gp': 'video/3gpp',       'ogv': 'video/ogg',
+        }
+        mime_type = mime_map.get(ext, 'video/mp4')
 
     return_resp = web.Response(
         status=206 if range_header else 200,
