@@ -2324,7 +2324,7 @@ watch_tmplt = """<!DOCTYPE html>
         <video id="mainPlayer"
                class="video-js vjs-theme-ft vjs-big-play-centered"
                controls preload="auto" playsinline crossorigin="anonymous">
-            <source src="{src}" type="video/mp4">
+            <source src="{src}" type="{mime_type}">
             <p class="vjs-no-js">Please enable JavaScript or upgrade your browser.</p>
         </video>
         <div id="vidErr">
@@ -2438,7 +2438,7 @@ watch_tmplt = """<!DOCTYPE html>
     });
     window._vjsPlayer = player;
 
-    player.src({ src: SRC, type: "video/mp4" });
+    player.src({ src: SRC, type: "{mime_type}" });
 
     /* ── Fetch track info from server (ffprobe) ── */
     var audioSel = document.getElementById("audioSelect");
@@ -3002,6 +3002,23 @@ async def media_watch(message_id):
     if not is_video:
         logger.warning(f"[media_watch] message {message_id} rejected: mime='{mime}' ext='{ext}' — not a recognised video")
         return error_tmplt
+
+    # Resolve the real MIME type for the player (Telegram often sends octet-stream for MKV/AVI)
+    import mimetypes as _mt
+    mime_map = {
+        'mkv': 'video/x-matroska', 'avi': 'video/x-msvideo',
+        'mov': 'video/quicktime',  'wmv': 'video/x-ms-wmv',
+        'flv': 'video/x-flv',     'webm': 'video/webm',
+        'm4v': 'video/x-m4v',     'ts': 'video/mp2t',
+        'mpeg': 'video/mpeg',      'mpg': 'video/mpeg',
+        '3gp': 'video/3gpp',       'ogv': 'video/ogg',
+        'mp4': 'video/mp4',
+    }
+    if mime and mime != 'application/octet-stream':
+        resolved_mime = mime
+    else:
+        resolved_mime = _mt.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
+
     file_name_safe = html.escape(file_name)
     heading   = html.escape(f'Watch \u2014 {file_name}')
 
@@ -3011,5 +3028,6 @@ async def media_watch(message_id):
              .replace('{heading}',    heading)
              .replace('{file_name}',  file_name_safe)
              .replace('{message_id}', str(message_id))
+             .replace('{mime_type}',  resolved_mime)
              .replace('{src}',        src))
     return html_
