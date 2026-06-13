@@ -1201,6 +1201,7 @@ async function loadHome() {
     try {
         const resp = await fetch('/api/tmdb-trending');
         const data = await resp.json();
+        if (data.error) throw new Error(data.error);
         botUsername = data.bot_username || botUsername;
 
         heroItems = (data.trending || []).filter(x => x.backdrop).slice(0, 6);
@@ -1225,7 +1226,13 @@ async function loadHome() {
         if (data.popular_anime)  { renderRow('rowAnime',     data.popular_anime);  enableDragScroll(document.getElementById('rowAnime')); }
     } catch(e) {
         console.error('Trending load failed:', e);
-        document.getElementById('heroTitle').textContent = 'Failed to load';
+        document.getElementById('heroTitle').textContent = 'Could not load content';
+        document.getElementById('heroOverview').textContent = 'Check your TMDB API key or network connection.';
+        const emptyMsg = '<div style="padding:20px 16px;color:var(--text3);font-size:13px">Could not load. Check connection.</div>';
+        ['rowTrending','rowMovies','rowTV','rowTopRated','rowAnime'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = emptyMsg;
+        });
     }
 
     // 3. Load today-airing + recently-added in background — won't block main rows
