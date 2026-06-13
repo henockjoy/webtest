@@ -1333,13 +1333,13 @@ async function loadRecentlyAdded() {
         const sec = document.getElementById('recentlyAddedSection');
         if (sec) sec.style.display = 'none';
     }
-    // Poll every 30 seconds for new files
-    setTimeout(pollRecentlyAdded, 30000);
+    // Poll every 10 seconds for new files
+    setTimeout(pollRecentlyAdded, 10000);
 }
 
 async function pollRecentlyAdded() {
     try {
-        const resp = await fetch('/api/recently-added?limit=10');
+        const resp = await fetch('/api/recently-added?limit=30&_t=' + Date.now());
         const data = await resp.json();
         const files = (data.files || []).filter(f => !_recentlyAddedIds.has(f.id));
         if (files.length > 0) {
@@ -1360,7 +1360,7 @@ async function pollRecentlyAdded() {
             }
         }
     } catch(e) {}
-    setTimeout(pollRecentlyAdded, 30000);
+    setTimeout(pollRecentlyAdded, 10000);
 }
 
 // ── TODAY RELEASED ROW ────────────────────────────────────────────────────
