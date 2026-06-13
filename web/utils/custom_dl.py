@@ -107,15 +107,18 @@ class TGCustomYield:
                 chunk = r.bytes
                 if not chunk:
                     break
-                offset += chunk_size
                 if part_count == 1:
                     yield chunk[first_part_cut:last_part_cut]
                     break
                 if current_part == 1:
                     yield chunk[first_part_cut:]
-                if 1 < current_part <= part_count:
+                elif current_part == part_count:
+                    yield chunk[:last_part_cut]
+                    break
+                else:
                     yield chunk
 
+                offset += chunk_size
                 r = await media_session.send(
                     raw.functions.upload.GetFile(
                         location=location,
