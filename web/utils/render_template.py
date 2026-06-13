@@ -24,8 +24,8 @@ webapp_template = """
             --card: #16161f;
             --card2: #1e1e2a;
             --border: rgba(255,255,255,0.07);
-            --accent: #0ea5e9;
-            --accent2: #38bdf8;
+            --accent: #e50914;
+            --accent2: #ff0f1b;
             --gold: #f5c518;
             --text: #ffffff;
             --text2: #b0b0c0;
@@ -70,7 +70,7 @@ webapp_template = """
             padding: 0 12px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
             cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
         }
-        .nav-search-pill:hover { background: var(--card2); border-color: rgba(14,165,233,0.35); color: #fff; }
+        .nav-search-pill:hover { background: var(--card2); border-color: rgba(229,9,20,0.35); color: #fff; }
         .nav-search-pill svg { flex: 0 0 auto; color: var(--text3); }
         .nav-search-pill span {
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -107,8 +107,8 @@ webapp_template = """
             transition: border-color 0.25s, box-shadow 0.25s;
         }
         .search-field-wrap:focus-within {
-            border-color: rgba(14, 165, 233, 0.4);
-            box-shadow: 0 0 14px rgba(14, 165, 233, 0.25);
+            border-color: rgba(229, 9, 20, 0.4);
+            box-shadow: 0 0 14px rgba(229, 9, 20, 0.25);
         }
         .search-field-wrap svg { color: var(--text3); flex-shrink: 0; }
         .search-field {
@@ -240,9 +240,9 @@ webapp_template = """
             border: none; cursor: pointer;
             transition: background 0.25s, transform 0.15s, box-shadow 0.25s;
             text-transform: uppercase; letter-spacing: 0.5px;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
+            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.3);
         }
-        .hero-btn:hover { background: #38bdf8; box-shadow: 0 6px 20px rgba(14, 165, 233, 0.45); }
+        .hero-btn:hover { background: #ff0f1b; box-shadow: 0 6px 20px rgba(229, 9, 20, 0.45); }
         .hero-btn:active { transform: scale(0.97); }
         .hero-dots {
             display: flex; gap: 6px; margin-top: 16px;
@@ -284,12 +284,12 @@ webapp_template = """
             scroll-padding: 0 16px;
             cursor: grab;
             scrollbar-width: thin;
-            scrollbar-color: rgba(14,165,233,0.4) transparent;
+            scrollbar-color: rgba(229,9,20,0.4) transparent;
         }
         .poster-scroll:active { cursor: grabbing; }
         .poster-scroll::-webkit-scrollbar { height: 4px; }
         .poster-scroll::-webkit-scrollbar-track { background: transparent; }
-        .poster-scroll::-webkit-scrollbar-thumb { background: rgba(14,165,233,0.4); border-radius: 2px; }
+        .poster-scroll::-webkit-scrollbar-thumb { background: rgba(229,9,20,0.4); border-radius: 2px; }
         @media (pointer: coarse) {
             .poster-scroll { scrollbar-width: none; }
             .poster-scroll::-webkit-scrollbar { display: none; }
@@ -315,7 +315,7 @@ webapp_template = """
             transition: border-color 0.3s ease;
         }
         .poster-card:hover .poster-img-wrap {
-            border-color: rgba(14, 165, 233, 0.4);
+            border-color: rgba(229, 9, 20, 0.4);
         }
         .poster-img {
             width: 100%; height: 100%; object-fit: cover;
@@ -505,8 +505,8 @@ webapp_template = """
         }
         .file-item:last-child { border-bottom: none; }
         .file-item:hover { background: var(--card2); transform: translateX(2px); }
-        .file-item:active { background: rgba(14,165,233,0.1); transform: scale(0.99); }
-        .file-item.selected { background: rgba(14,165,233,0.14); border-color: rgba(14,165,233,0.38); }
+        .file-item:active { background: rgba(229,9,20,0.1); transform: scale(0.99); }
+        .file-item.selected { background: rgba(229,9,20,0.14); border-color: rgba(229,9,20,0.38); }
         
         /* Genre pills in modal */
         .modal-genres {
@@ -533,7 +533,7 @@ webapp_template = """
         .file-item-size { font-size: 11px; color: var(--text3); font-weight: 500; }
         .file-item-get {
             width: 30px; height: 30px; flex-shrink: 0;
-            background: rgba(14,165,233,0.15); border-radius: 50%;
+            background: rgba(229,9,20,0.15); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             color: var(--accent);
         }
@@ -554,7 +554,7 @@ webapp_template = """
         }
         .season-btn.active {
             background: var(--accent); color: #fff;
-            border-color: rgba(14,165,233,0.75);
+            border-color: rgba(229,9,20,0.75);
         }
         .episode-panel { display: flex; flex-direction: column; gap: 4px; }
         .episode-kicker {
@@ -564,10 +564,10 @@ webapp_template = """
         }
         .episode-number {
             width: 38px; height: 38px; border-radius: var(--radius-sm);
-            background: rgba(14,165,233,0.13); color: var(--accent);
+            background: rgba(229,9,20,0.13); color: var(--accent);
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0; font-size: 12px; font-weight: 800;
-            border: 1px solid rgba(14,165,233,0.18);
+            border: 1px solid rgba(229,9,20,0.18);
         }
         .modal-loading {
             text-align: center; padding: 40px 20px; color: var(--text3);
@@ -729,7 +729,7 @@ webapp_template = """
         }
         .today-ep-badge {
             display: inline-flex; align-items: center; gap: 5px;
-            background: rgba(14,165,233,0.15); border: 1px solid rgba(14,165,233,0.3);
+            background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.3);
             color: var(--accent); font-size: 11px; font-weight: 800;
             padding: 3px 8px; border-radius: 6px; margin-bottom: 5px;
             letter-spacing: 0.2px;
@@ -756,7 +756,7 @@ webapp_template = """
 
         /* Today Airing nav button */
         .nav-today-btn {
-            background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.3);
+            background: rgba(229,9,20,0.12); border: 1px solid rgba(229,9,20,0.3);
             color: var(--accent); border-radius: 8px;
             padding: 0 10px; height: 40px;
             display: flex; align-items: center; gap: 6px;
@@ -765,7 +765,7 @@ webapp_template = """
             transition: background 0.2s, border-color 0.2s;
             letter-spacing: 0.2px;
         }
-        .nav-today-btn:hover { background: rgba(14,165,233,0.22); border-color: rgba(14,165,233,0.5); }
+        .nav-today-btn:hover { background: rgba(229,9,20,0.22); border-color: rgba(229,9,20,0.5); }
         .nav-today-dot {
             width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
             box-shadow: 0 0 8px var(--accent);
@@ -776,7 +776,7 @@ webapp_template = """
         /* ── RECENTLY ADDED ROW ── */
         .live-badge {
             display: inline-flex; align-items: center; gap: 5px;
-            background: rgba(14,165,233,.14); border: 1px solid rgba(14,165,233,.32);
+            background: rgba(229,9,20,.14); border: 1px solid rgba(229,9,20,.32);
             color: var(--accent); font-size: 9px; font-weight: 800;
             letter-spacing: .08em; text-transform: uppercase;
             padding: 2px 8px; border-radius: 20px; flex-shrink: 0;
@@ -2038,26 +2038,26 @@ no_tmdb_template = """
             font-family:'Outfit',sans-serif; background:#0a0a0f; color:#fff;
             min-height:100vh; display:flex; align-items:center; justify-content:center;
             padding:30px 24px; text-align:center;
-            background-image: radial-gradient(ellipse at 50% 0%, rgba(14,165,233,0.08) 0%, transparent 60%);
+            background-image: radial-gradient(ellipse at 50% 0%, rgba(229,9,20,0.08) 0%, transparent 60%);
         }
         .wrap { max-width:380px; }
         .icon {
             width:90px; height:90px; border-radius:24px; margin:0 auto 28px;
             background:linear-gradient(135deg,#1a1a2e,#16213e);
-            border:1px solid rgba(14,165,233,0.3);
+            border:1px solid rgba(229,9,20,0.3);
             display:flex; align-items:center; justify-content:center; font-size:40px;
-            box-shadow: 0 0 40px rgba(14,165,233,0.1);
+            box-shadow: 0 0 40px rgba(229,9,20,0.1);
         }
         h1 { font-size:26px; font-weight:800; margin-bottom:12px; letter-spacing:-0.5px; }
         p { font-size:15px; color:#888; line-height:1.7; }
         code {
-            display:inline-block; background:#1e1e2a; color:#0ea5e9;
+            display:inline-block; background:#1e1e2a; color:#e50914;
             padding:3px 10px; border-radius:6px; font-size:14px;
-            border:1px solid rgba(14,165,233,0.25); margin:4px 0;
+            border:1px solid rgba(229,9,20,0.25); margin:4px 0;
             font-family:monospace;
         }
         .divider {
-            width:60px; height:2px; background:linear-gradient(90deg,transparent,#0ea5e9,transparent);
+            width:60px; height:2px; background:linear-gradient(90deg,transparent,#e50914,transparent);
             margin:24px auto;
         }
         .note { font-size:12px; color:#444; margin-top:16px; }
@@ -2071,7 +2071,7 @@ no_tmdb_template = """
     <p>The WebApp requires a <b>TMDB API Key</b> to function.</p>
     <p style="margin-top:12px">If you're an admin, set the environment variable:</p>
     <p style="margin-top:10px"><code>TMDB_API_KEY</code></p>
-    <p style="margin-top:14px; color:#555">Get your free API key at<br><span style="color:#0ea5e9">themoviedb.org/settings/api</span></p>
+    <p style="margin-top:14px; color:#555">Get your free API key at<br><span style="color:#e50914">themoviedb.org/settings/api</span></p>
     <div class="note">This message is only shown when the key is not configured.</div>
 </div>
 <script>
@@ -2393,7 +2393,7 @@ error_tmplt = """<!DOCTYPE html>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     <style>
         :root {
-            --p:#818cf8; --p2:#6366f1; --sec:#a78bfa; --acc:#38bdf8;
+            --p:#818cf8; --p2:#6366f1; --sec:#a78bfa; --acc:#ff0f1b;
             --txt:#f1f5f9; --txt2:#94a3b8;
             --bg:#020617; --glass:rgba(10,18,38,.8); --gb:rgba(129,140,248,.13);
             --err:#f43f5e; --err2:rgba(244,63,94,.15);
