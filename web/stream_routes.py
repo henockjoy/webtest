@@ -1119,7 +1119,10 @@ async def recently_added_handler(request):
                 "overview": meta.get("overview", ""),
             })
 
-        return web.json_response({"files": enriched})
+        return web.json_response({"files": enriched}, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        })
     except Exception as e:
         return web.json_response({"files": [], "error": str(e)}, status=500)
 
