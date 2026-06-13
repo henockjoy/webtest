@@ -1268,7 +1268,7 @@ async function loadTodayReleased(trendingMovies) {
     } catch(e) {
         console.error('Today released load failed:', e);
         const el = document.getElementById('rowTodayReleased');
-        if (el) el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load today\'s releases.</div>';
+        if (el) el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load today releases.</div>';
     }
 }
 
