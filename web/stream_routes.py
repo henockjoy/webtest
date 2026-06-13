@@ -701,6 +701,49 @@ async def tmdb_trending_handler(request):
         return web.json_response({"error": str(e)}, status=500)
 
 
+@routes.get("/api/debug-watch/{message_id}")
+async def debug_watch_handler(request):
+    """Diagnostic endpoint — returns a JSON breakdown of every check in media_watch."""
+    import traceback
+    message_id = int(request.match_info['message_id'])
+    result = {"message_id": message_id, "bin_channel": BIN_CHANNEL, "steps": []}
+    try:
+        media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+        result["steps"].append("get_messages: ok")
+        result["msg_id_returned"] = getattr(media_msg, "id", None)
+        result["msg_empty"] = media_msg is None
+        if not media_msg or not media_msg.media:
+            result["steps"].append("FAIL: message missing or no media")
+            result["media_value"] = None
+            return web.json_response(result)
+        result["media_type_enum"] = str(media_msg.media)
+        media = getattr(media_msg, media_msg.media.value, None)
+        if not media:
+            result["steps"].append("FAIL: getattr media returned None")
+            return web.json_response(result)
+        result["steps"].append("media object: ok")
+        result["mime_type"]  = getattr(media, "mime_type", None)
+        result["file_name"]  = getattr(media, "file_name", None)
+        result["file_size"]  = getattr(media, "file_size", None)
+        result["file_id"]    = getattr(media, "file_id", None)
+        mime = getattr(media, 'mime_type', '') or ''
+        file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
+        tag = mime.split('/')[0].strip().lower()
+        ext = re.sub(r'^.*\.', '', file_name.lower()) if '.' in file_name else ''
+        VIDEO_EXTS = {'mp4','mkv','avi','mov','wmv','flv','webm','m4v','ts','mpeg','mpg','3gp','ogv'}
+        is_video = (tag == 'video') or (mime == 'application/octet-stream') or (ext in VIDEO_EXTS)
+        result["tag"] = tag
+        result["ext"] = ext
+        result["is_video_check"] = is_video
+        result["steps"].append("is_video: " + str(is_video))
+        if not is_video:
+            result["steps"].append("FAIL: mime/ext check rejected the file")
+    except Exception as e:
+        result["steps"].append(f"EXCEPTION: {e}")
+        result["traceback"] = traceback.format_exc()
+    return web.json_response(result)
+
+
 @routes.get("/api/repair-status")
 async def repair_status_handler(request):
     repair = await db.get_repair_mode()
