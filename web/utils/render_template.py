@@ -1272,12 +1272,15 @@ async function loadTodayReleased(trendingMovies) {
     }
 }
 
+let _recentlyAddedIds = new Set();
+
 async function loadRecentlyAdded() {
     try {
         const resp  = await fetch('/api/recently-added');
         const data  = await resp.json();
         const files = data.files || [];
         if (files.length > 0) {
+            files.forEach(f => _recentlyAddedIds.add(f.id));
             renderRecentlyAdded(files);
             enableDragScroll(document.getElementById('rowRecentlyAdded'));
         } else {
@@ -1289,6 +1292,34 @@ async function loadRecentlyAdded() {
         const sec = document.getElementById('recentlyAddedSection');
         if (sec) sec.style.display = 'none';
     }
+    // Poll every 30 seconds for new files
+    setTimeout(pollRecentlyAdded, 30000);
+}
+
+async function pollRecentlyAdded() {
+    try {
+        const resp = await fetch('/api/recently-added?limit=10');
+        const data = await resp.json();
+        const files = (data.files || []).filter(f => !_recentlyAddedIds.has(f.id));
+        if (files.length > 0) {
+            files.forEach(f => _recentlyAddedIds.add(f.id));
+            const row = document.getElementById('rowRecentlyAdded');
+            if (row) {
+                // Prepend new cards with a highlight
+                const tmp = document.createElement('div');
+                renderRecentlyAddedInto(tmp, files);
+                Array.from(tmp.children).reverse().forEach(card => {
+                    card.style.outline = '2px solid var(--accent)';
+                    card.style.outlineOffset = '2px';
+                    row.prepend(card);
+                    setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 4000);
+                });
+                const sec = document.getElementById('recentlyAddedSection');
+                if (sec) sec.style.display = '';
+            }
+        }
+    } catch(e) {}
+    setTimeout(pollRecentlyAdded, 30000);
 }
 
 // ── TODAY RELEASED ROW ────────────────────────────────────────────────────
@@ -1391,6 +1422,43 @@ function renderRecentlyAdded(files) {
             }
         };
         el.appendChild(card);
+    });
+}
+
+function renderRecentlyAddedInto(container, files) {
+    files.forEach((file, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card fade-up';
+        card.style.animationDelay = `${i * 0.03}s`;
+        const posterSrc = file.poster || null;
+        const posterHTML = posterSrc
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="imgError(this)">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
+        let epText = '';
+        if (file.season != null && file.episode != null)
+            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
+        else if (file.season != null)
+            epText = `S${String(file.season).padStart(2,'0')}`;
+        const badgeText = epText || typeStr;
+        const ratingVal = file.rating || 0;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
+                <div class="poster-type-badge">${badgeText}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
+            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
+        `;
+        card.onclick = () => {
+            if (file.tmdb_id || (file.type && file.poster)) {
+                openModal({ id: file.tmdb_id, source: 'tmdb', title: file.title || file.name, type: file.type || 'movie', year: file.year || '', rating: ratingVal, poster: posterSrc, overview: file.overview || '' });
+            } else {
+                selectFileById(file);
+            }
+        };
+        container.appendChild(card);
     });
 }
 
@@ -2020,373 +2088,329 @@ watch_tmplt = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{heading}</title>
-    <!-- VidKing Player CSS -->
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css">
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css">
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --p:#818cf8; --p2:#6366f1; --sec:#a78bfa; --acc:#38bdf8;
-            --txt:#f1f5f9; --txt2:#94a3b8;
-            --bg:#020617; --glass:rgba(10,18,38,.8); --gb:rgba(129,140,248,.13);
+            --accent: #e50914;
+            --bg: #0a0a0f;
+            --card: #111118;
+            --border: rgba(255,255,255,0.07);
+            --txt: #ffffff;
+            --txt2: #94a3b8;
         }
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         body {
-            font-family:'Inter',sans-serif;
-            background:var(--bg); color:var(--txt);
-            min-height:100vh;
-            display:flex; flex-direction:column;
-            overflow-x:hidden;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg); color: var(--txt);
+            min-height: 100vh; display: flex; flex-direction: column;
+            overflow-x: hidden;
         }
         body::before {
             content:''; position:fixed; inset:0; z-index:-1;
             background:
-                radial-gradient(ellipse 75% 50% at 10% 20%, rgba(99,102,241,.12) 0%, transparent 58%),
-                radial-gradient(ellipse 60% 40% at 90% 80%, rgba(167,139,250,.09) 0%, transparent 55%),
-                linear-gradient(160deg, #020617 0%, #070c1b 45%, #0f172a 100%);
+                radial-gradient(ellipse 70% 50% at 10% 20%, rgba(229,9,20,.08) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 90% 80%, rgba(229,9,20,.05) 0%, transparent 55%),
+                linear-gradient(160deg,#0a0a0f 0%,#0d0d15 50%,#111118 100%);
         }
-
-        /* Header */
         header {
-            padding:.8rem 1.5rem;
-            backdrop-filter:blur(24px) saturate(180%);
-            -webkit-backdrop-filter:blur(24px) saturate(180%);
-            background:var(--glass);
-            border-bottom:1px solid var(--gb);
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
-            box-shadow:0 1px 32px rgba(0,0,0,.45);
+            padding: .85rem 1.5rem;
+            background: rgba(10,10,15,.85);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            display: flex; flex-direction: column; align-items: center; gap: .3rem;
         }
-        .header-logo {
-            font-size:1rem; font-weight:800; letter-spacing:-.01em;
-            background:linear-gradient(90deg,#e2e8f0 0%,var(--p) 50%,var(--acc) 100%);
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+        .logo {
+            font-size: 1.05rem; font-weight: 800;
+            background: linear-gradient(90deg,#fff 0%,var(--accent) 60%,#ff6b35 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
         #file-name {
-            font-size:.82rem; color:var(--txt2); margin-top:.3rem; font-weight:500;
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-            max-width:100%; text-align:center;
+            font-size: .78rem; color: var(--txt2); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 92vw; text-align: center;
         }
-
-        /* Container */
         .container {
-            flex:1; display:flex; flex-direction:column; align-items:center;
-            padding:2.5rem 1.5rem 3rem; width:100%;
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            padding: 1.8rem 1rem 2.5rem; width: 100%; max-width: 1100px; margin: 0 auto;
         }
-
-        /* ── Badge ── */
-        .badge {
-            display:inline-flex; align-items:center; gap:.4rem;
-            background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3);
-            padding:.3rem .9rem; border-radius:30px;
-            font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#10b981;
-            margin-bottom:1.5rem; backdrop-filter:blur(8px);
+        .live-badge {
+            display: inline-flex; align-items: center; gap: .4rem;
+            background: rgba(229,9,20,.12); border: 1px solid rgba(229,9,20,.35);
+            padding: .28rem .9rem; border-radius: 30px;
+            font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--accent); margin-bottom: 1.2rem;
         }
-        .badge-dot {
-            width:6px; height:6px; background:#10b981; border-radius:50%;
-            box-shadow:0 0 10px #10b981; animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite;
+        .live-dot {
+            width: 6px; height: 6px; background: var(--accent); border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite;
         }
         @keyframes pulse { 50% { opacity:.3; box-shadow:none; } }
 
-        /* ── Player wrap ── */
+        /* ── Player wrapper ── */
         .player-wrap {
-            position:relative; width:100%; max-width:1060px;
-            border-radius:24px; padding:1px; z-index:10;
+            width: 100%; position: relative;
+            border-radius: 16px; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,.6);
+            background: #000;
+            aspect-ratio: 16/9;
         }
-        .player-ambient {
-            position:absolute; inset:-2px; z-index:-1;
-            background:linear-gradient(135deg,rgba(99,102,241,.4),rgba(167,139,250,.2),rgba(56,189,248,.3));
-            filter:blur(35px); opacity:.3; transform:translateZ(0); border-radius:inherit;
+        .video-js {
+            position: absolute !important; inset: 0 !important;
+            width: 100% !important; height: 100% !important;
+            border-radius: 16px;
         }
-        .player-card {
-            position:relative; background:#000; border-radius:22px;
-            overflow:hidden; box-shadow:0 25px 65px rgba(0,0,0,.5);
-            aspect-ratio:16/9; width:100%;
+        /* Video.js skin overrides */
+        .vjs-theme-filmotainment .vjs-control-bar {
+            background: linear-gradient(to top, rgba(0,0,0,.85) 0%, transparent 100%);
+            height: 3.6em;
         }
-
-        /* ── VidKing / native video fill ── */
-        #mainPlayer {
-            position:absolute; inset:0;
-            width:100% !important; height:100% !important;
-            border-radius:22px;
-            background:#000;
+        .vjs-theme-filmotainment .vjs-play-progress,
+        .vjs-theme-filmotainment .vjs-volume-level { background: var(--accent); }
+        .vjs-theme-filmotainment .vjs-slider { background: rgba(255,255,255,.2); }
+        .vjs-theme-filmotainment .vjs-big-play-button {
+            background: rgba(229,9,20,.85) !important;
+            border: none !important; border-radius: 50% !important;
+            width: 64px !important; height: 64px !important;
+            line-height: 64px !important;
+            top: 50% !important; left: 50% !important;
+            transform: translate(-50%,-50%) !important;
         }
-
-        /* ── Skeleton loader ── */
-        .skeleton {
-            position:absolute; inset:0; background:#0a0e1c; z-index:20; border-radius:22px;
-            overflow:hidden; pointer-events:none; transition:opacity .4s, visibility .4s;
+        .vjs-theme-filmotainment:hover .vjs-big-play-button {
+            background: var(--accent) !important;
+            transform: translate(-50%,-50%) scale(1.08) !important;
         }
-        .skeleton::after {
-            content:''; position:absolute; inset:0;
-            background:linear-gradient(90deg,transparent,rgba(129,140,248,.08),transparent);
-            transform:translateX(-100%); animation:shimmer 1.8s infinite;
+        .vjs-theme-filmotainment .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+            background: rgba(15,15,20,.97);
+            border: 1px solid var(--border);
+            border-radius: 8px;
         }
-        @keyframes shimmer { 100% { transform:translateX(100%); } }
-        .skeleton.gone { opacity:0; visibility:hidden; pointer-events:none; }
+        .vjs-theme-filmotainment .vjs-menu li.vjs-selected { color: var(--accent); }
+        .vjs-theme-filmotainment .vjs-menu li:hover { background: rgba(229,9,20,.15); }
+        /* Subtitle / caption styling */
+        .vjs-text-track-display { font-family: 'Inter', sans-serif !important; }
+        ::cue {
+            background: rgba(0,0,0,.75);
+            color: #fff;
+            font-size: 1.1em;
+            font-family: 'Inter', sans-serif;
+        }
 
         /* ── Error overlay ── */
-        .player-err-overlay {
-            position:absolute; inset:0; z-index:50; border-radius:22px;
-            background:rgba(2,6,23,.93); backdrop-filter:blur(14px);
-            opacity:0; visibility:hidden;
-            display:flex; align-items:center; justify-content:center;
-            text-align:center; padding:2rem;
-            transition:opacity .35s ease, visibility .35s ease;
+        #vidErr {
+            display: none; position: absolute; inset: 0; z-index: 99;
+            background: rgba(10,10,15,.94); border-radius: 16px;
+            flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 2rem;
         }
-        .player-err-overlay.show { opacity:1; visibility:visible; }
-        .err-card-sm { max-width:420px; width:100%; }
-        .err-card-sm h2 { font-size:1.4rem; font-weight:800; margin-bottom:.5rem; letter-spacing:-.02em; }
-        .err-card-sm p { font-size:.85rem; color:var(--txt2); line-height:1.55; }
+        #vidErr.show { display: flex; }
+        #vidErr svg { color: rgba(255,255,255,.5); margin-bottom: 1rem; }
+        #vidErr h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .5rem; }
+        #vidErr p  { font-size: .85rem; color: var(--txt2); line-height: 1.55; }
 
         /* ── Action buttons ── */
         .btn-row {
-            display:grid; grid-template-columns:repeat(3,1fr); gap:.8rem;
-            margin-top:1.2rem; width:100%; max-width:1060px;
+            display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem;
+            margin-top: 1.1rem; width: 100%;
         }
         .btn-row-2 {
-            display:grid; grid-template-columns:repeat(2,1fr); gap:.8rem;
-            margin-top:.6rem; width:100%; max-width:1060px;
+            display: grid; grid-template-columns: repeat(2,1fr); gap: .75rem;
+            margin-top: .6rem; width: 100%;
         }
         .xbtn {
-            position:relative; overflow:hidden;
-            display:flex; align-items:center; justify-content:center; gap:.5rem;
-            width:100%; padding:.72rem .9rem;
-            border-radius:11px; border:none;
-            font-family:'Inter',sans-serif; font-size:.84rem; font-weight:600;
-            letter-spacing:.01em; cursor:pointer; text-decoration:none; color:#fff;
-            transition:transform .2s, box-shadow .2s, filter .2s;
+            display: flex; align-items: center; justify-content: center; gap: .45rem;
+            width: 100%; padding: .72rem .9rem; border-radius: 10px; border: none;
+            font-family: 'Inter',sans-serif; font-size: .82rem; font-weight: 600;
+            cursor: pointer; text-decoration: none; color: #fff;
+            transition: transform .18s, box-shadow .18s, filter .18s;
         }
-        .xbtn::after {
-            content:''; position:absolute; inset:0;
-            background:rgba(255,255,255,.08); opacity:0; transition:opacity .18s;
-        }
-        .xbtn:hover::after { opacity:1; }
-        .xbtn:hover { transform:scale(1.02); filter:brightness(1.08); }
-        .xbtn:active { transform:scale(.98); }
+        .xbtn:hover { transform: scale(1.02); filter: brightness(1.1); }
+        .xbtn:active { transform: scale(.97); }
+        .btn-dl  { background: linear-gradient(135deg,#4f46e5,#818cf8); box-shadow:0 4px 14px rgba(99,102,241,.35); }
+        .btn-vlc { background: linear-gradient(135deg,#92400e,#f59e0b); color:#1a1a1a; box-shadow:0 4px 14px rgba(245,158,11,.3); }
+        .btn-mx  { background: linear-gradient(135deg,#065f46,#10b981); box-shadow:0 4px 14px rgba(16,185,129,.3); }
+        .btn-sp  { background: linear-gradient(135deg,#9f1239,#f43f5e); box-shadow:0 4px 14px rgba(244,63,94,.3); }
+        .btn-np  { background: linear-gradient(135deg,#4a1d96,#7c3aed); box-shadow:0 4px 14px rgba(124,58,237,.3); }
 
-        .btn-dl  { background:linear-gradient(135deg,#4f46e5,#818cf8,#a78bfa); box-shadow:0 4px 16px rgba(99,102,241,.38); }
-        .btn-dl:hover  { box-shadow:0 7px 24px rgba(99,102,241,.55); }
-        .btn-vlc { background:linear-gradient(135deg,#92400e,#f59e0b,#fde68a); color:#1a1a1a; box-shadow:0 4px 16px rgba(245,158,11,.35); }
-        .btn-vlc:hover { box-shadow:0 7px 24px rgba(245,158,11,.52); }
-        .btn-mx  { background:linear-gradient(135deg,#065f46,#10b981,#6ee7b7); box-shadow:0 4px 16px rgba(16,185,129,.35); }
-        .btn-mx:hover  { box-shadow:0 7px 24px rgba(16,185,129,.52); }
-        .btn-sp  { background:linear-gradient(135deg,#9f1239,#f43f5e,#fb7185); box-shadow:0 4px 16px rgba(244,63,94,.35); }
-        .btn-sp:hover  { box-shadow:0 7px 24px rgba(244,63,94,.52); }
-        .btn-np  { background:linear-gradient(135deg,#4a1d96,#7c3aed,#c4b5fd); box-shadow:0 4px 16px rgba(124,58,237,.35); }
-        .btn-np:hover  { box-shadow:0 7px 24px rgba(124,58,237,.52); }
-
-        /* ── Footer ── */
         footer {
-            padding:.85rem 1.5rem; text-align:center;
-            color:var(--txt2); font-size:.73rem; margin-top:auto;
+            padding: .8rem 1.5rem; text-align: center;
+            color: var(--txt2); font-size: .72rem; margin-top: auto;
         }
-        footer::before {
-            content:''; display:block; width:90px; height:1px;
-            background:linear-gradient(90deg,transparent,rgba(129,140,248,.28),transparent);
-            margin:0 auto .7rem;
-        }
-        .ha-link { color:var(--p); text-decoration:none; font-weight:600; transition:opacity .2s; }
-        .ha-link:hover { opacity:.7; }
+        .ha-link { color: var(--accent); text-decoration: none; font-weight: 600; }
 
-        /* ── VidKing theme overrides ── */
-        media-player {
-            --media-brand: #818cf8;
-            --media-focus-ring: #818cf8;
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            inset: 0;
-            border-radius: 22px;
-            overflow: hidden;
-            background: #000;
-        }
-        media-provider { width:100%; height:100%; }
-
-        /* Responsive */
         @media (max-width:600px) {
-            .container { padding:1rem .85rem .85rem; }
-            .btn-row { grid-template-columns:1fr 1fr; gap:.6rem; }
-            .btn-row-2 { grid-template-columns:1fr 1fr; gap:.6rem; }
-            .xbtn { padding:.78rem 1rem; font-size:.78rem; }
-            #file-name { font-size:.78rem; }
+            .container { padding: 1rem .75rem 2rem; }
+            .btn-row { grid-template-columns: 1fr 1fr; gap: .55rem; }
+            .btn-row-2 { grid-template-columns: 1fr 1fr; gap: .55rem; }
+            .xbtn { font-size: .76rem; padding: .7rem .7rem; }
         }
         @media (max-width:400px) {
-            .btn-row { grid-template-columns:1fr; }
-            .btn-row-2 { grid-template-columns:1fr; }
+            .btn-row, .btn-row-2 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
 <header>
-    <span class="header-logo">Filmotainment</span>
+    <span class="logo">Filmotainment</span>
     <div id="file-name">{file_name}</div>
 </header>
 
 <div class="container">
-
-    <div class="badge">
-        <span class="badge-dot"></span>
-        ONLINE STREAM
-    </div>
+    <div class="live-badge"><span class="live-dot"></span>ONLINE STREAM</div>
 
     <div class="player-wrap">
-        <div class="player-ambient"></div>
-        <div class="player-card">
-            <!-- Loading skeleton -->
-            <div class="skeleton" id="skel"></div>
+        <!-- Video.js player -->
+        <video id="mainPlayer"
+               class="video-js vjs-theme-filmotainment vjs-big-play-centered"
+               controls preload="auto" playsinline
+               data-setup='{}'>
+            <source src="{src}" type="video/mp4">
+            <!-- Subtitle/caption tracks are added via JS below -->
+            <p class="vjs-no-js">
+                To view this video please enable JavaScript, or consider upgrading to a
+                browser that supports HTML5 video.
+            </p>
+        </video>
 
-            <!-- Error overlay -->
-            <div class="player-err-overlay" id="vidErr">
-                <div class="err-card-sm">
-                    <div style="margin-bottom:1.2rem;color:rgba(255,255,255,.7)">
-                        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                    </div>
-                    <h2>Stream Failed to Load</h2>
-                    <p>The stream couldn't start. Try downloading the file or opening it in an external player below.</p>
-                </div>
-            </div>
-
-            <!-- VidKing / vidstack player -->
-            <media-player id="mainPlayer" src="{src}" playsinline>
-                <media-provider></media-provider>
-                <media-video-layout></media-video-layout>
-            </media-player>
+        <!-- Error overlay -->
+        <div id="vidErr">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h2>Stream Failed to Load</h2>
+            <p>The stream could not start. Try downloading the file or opening it in an external player.</p>
         </div>
     </div>
 
     <!-- Row 1: Download · VLC · MX Player -->
     <div class="btn-row">
         <a id="dlBtn" href="{src}" class="xbtn btn-dl" download>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download
+            </svg>Download
         </a>
         <a id="vlcBtn" href="#" class="xbtn btn-vlc">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            VLC Player
+            </svg>VLC Player
         </a>
         <a id="mxBtn" href="#" class="xbtn btn-mx">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polygon points="10 8 16 12 10 16 10 8"/>
-            </svg>
-            MX Player
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+            </svg>MX Player
         </a>
     </div>
 
     <!-- Row 2: SPlayer · nPlayer -->
     <div class="btn-row-2">
         <a id="splayerBtn" href="#" class="xbtn btn-sp">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 18V5l12-2v13"/>
-                <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
-            </svg>
-            SPlayer
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg>SPlayer
         </a>
         <a id="nplayerBtn" href="#" class="xbtn btn-np">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                <polyline points="8 21 12 17 16 21"/>
-            </svg>
-            nPlayer
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><polyline points="8 21 12 17 16 21"/>
+            </svg>nPlayer
         </a>
     </div>
-
 </div>
 
 <footer>
     <p>Powered by <a href="https://t.me/FT_Channels" class="ha-link" target="_blank" rel="noopener">Filmotainment</a></p>
 </footer>
 
-<!-- VidKing (vidstack) JS — ESM via CDN -->
-<script type="module">
-    import { PlyrLayout, VidstackPlayer } from 'https://cdn.vidstack.io/player';
+<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script>
+(function() {
+    var SRC = "{src}";
+    var enc = encodeURIComponent(SRC);
+    var noScheme = SRC.replace(/^https?:\/\//, '');
+    var isHttps  = SRC.startsWith('https');
 
-    const SRC = "{src}";
-    const skel   = document.getElementById('skel');
-    const vidErr = document.getElementById('vidErr');
-    let errTriggered = false;
-    let loadOk = false;
+    // External player deep links
+    document.getElementById('vlcBtn').href      = 'vlc://' + SRC;
+    document.getElementById('mxBtn').href       = 'intent:' + SRC + '#Intent;package=com.mxtech.videoplayer.ad;S.title={file_name};end';
+    document.getElementById('splayerBtn').href  = 'splayer://control/play?url=' + enc;
+    document.getElementById('nplayerBtn').href  = (isHttps ? 'nplayer-https://' : 'nplayer-http://') + noScheme;
 
-    const hideSkel  = () => skel && skel.classList.add('gone');
-    const showError = () => {
-        if (errTriggered) return;
-        errTriggered = true;
-        hideSkel();
-        vidErr && vidErr.classList.add('show');
-    };
-
-    // ── Wire up external player buttons ──────────────────────────────
-    const enc = encodeURIComponent(SRC);
-    const noScheme = SRC.replace(/^https?:\\/\\//, '');
-    const isHttps  = SRC.startsWith('https');
-
-    // VLC — works on Android (vlc://) and iOS (vlc-x-callback://)
-    document.getElementById('vlcBtn').href = 'vlc://' + SRC;
-    // MX Player — Android Intent URI (falls back gracefully on iOS/desktop)
-    document.getElementById('mxBtn').href =
-        'intent:' + SRC + '#Intent;package=com.mxtech.videoplayer.ad;S.title={file_name};end';
-    // SPlayer
-    document.getElementById('splayerBtn').href = 'splayer://control/play?url=' + enc;
-    // nPlayer — uses nplayer-http:// or nplayer-https:// scheme
-    document.getElementById('nplayerBtn').href =
-        (isHttps ? 'nplayer-https://' : 'nplayer-http://') + noScheme;
-
-    // ── Init VidKing player ───────────────────────────────────────────
-    try {
-        const player = await VidstackPlayer.create({
-            target: '#mainPlayer',
-            src: SRC,
-            layout: new PlyrLayout(),
-            playsinline: true,
-            crossorigin: 'anonymous',
-        });
-
-        player.addEventListener('can-play',     () => { loadOk = true; hideSkel(); });
-        player.addEventListener('playing',       () => { loadOk = true; hideSkel(); });
-        player.addEventListener('loaded-metadata', () => { loadOk = true; hideSkel(); });
-
-        player.addEventListener('error', () => {
-            if (!loadOk) showError();
-        });
-
-        // Fallback timeout — 20 s
-        setTimeout(() => { if (!loadOk) showError(); }, 20000);
-
-    } catch (initErr) {
-        console.warn('VidKing init failed, falling back to native video:', initErr);
-        // ── Fallback: plain <video> element ──────────────────────────
-        const card = document.querySelector('.player-card');
-        const mediaEl = document.getElementById('mainPlayer');
-        // Remove the custom element and insert a plain video
-        mediaEl.remove();
-        const vid = document.createElement('video');
-        vid.id = 'mainPlayer';
-        vid.src = SRC;
-        vid.controls = true;
-        vid.playsinline = true;
-        vid.preload = 'metadata';
-        vid.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border-radius:22px;background:#000;';
-        card.appendChild(vid);
-
-        vid.addEventListener('loadedmetadata', () => { loadOk = true; hideSkel(); });
-        vid.addEventListener('canplay',        () => { loadOk = true; hideSkel(); });
-        vid.addEventListener('playing',        () => { loadOk = true; hideSkel(); });
-        vid.addEventListener('error',          () => { if (!loadOk) showError(); });
-        setTimeout(() => { if (!loadOk) showError(); }, 20000);
+    var errShown = false;
+    function showErr() {
+        if (errShown) return;
+        errShown = true;
+        var e = document.getElementById('vidErr');
+        if (e) e.classList.add('show');
     }
+
+    // Init Video.js
+    var player = videojs('mainPlayer', {
+        fluid: false,
+        fill: true,
+        responsive: true,
+        playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
+        html5: {
+            vhs: { overrideNative: false },
+            nativeVideoTracks: true,
+            nativeAudioTracks: true,
+            nativeTextTracks: true
+        },
+        controlBar: {
+            children: [
+                'playToggle',
+                'volumePanel',
+                'currentTimeDisplay',
+                'timeDivider',
+                'durationDisplay',
+                'progressControl',
+                'liveDisplay',
+                'seekToLive',
+                'remainingTimeDisplay',
+                'customControlSpacer',
+                'playbackRateMenuButton',
+                'chaptersButton',
+                'audioTrackButton',
+                'subsCapsButton',
+                'pictureInPictureToggle',
+                'fullscreenToggle'
+            ]
+        }
+    });
+
+    player.src({ src: SRC, type: 'video/mp4' });
+
+    player.ready(function() {
+        // Auto-detect embedded audio tracks (multi-language MKV/MP4)
+        var audioTracks = player.audioTracks();
+        if (audioTracks && audioTracks.length > 1) {
+            console.log('Audio tracks detected:', audioTracks.length);
+        }
+
+        // Auto-detect embedded text/subtitle tracks
+        var textTracks = player.textTracks();
+        if (textTracks && textTracks.length > 0) {
+            console.log('Subtitle tracks detected:', textTracks.length);
+        }
+    });
+
+    player.on('error', function() {
+        var err = player.error();
+        console.warn('Video.js error:', err);
+        showErr();
+    });
+
+    // Fallback timeout
+    setTimeout(function() {
+        if (player.paused() && player.currentTime() === 0 && !player.seeking()) {
+            showErr();
+        }
+    }, 25000);
+})();
 </script>
 </body>
 </html>
