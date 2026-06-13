@@ -1,4 +1,4 @@
-from info import BIN_CHANNEL, URL1
+from info import BIN_CHANNEL, URL
 from utils import temp
 from web.utils.custom_dl import TGCustomYield
 import urllib.parse
