@@ -2095,7 +2095,7 @@ watch_tmplt = """<!DOCTYPE html>
     <style>
         :root {
             --accent:#e50914; --bg:#0a0a0f; --border:rgba(255,255,255,.07);
-            --txt:#fff; --txt2:#94a3b8; --card:#111118;
+            --txt:#fff; --txt2:#94a3b8; --card:#16161f; --card2:#1e1e2a;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Inter,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
@@ -2103,42 +2103,56 @@ watch_tmplt = """<!DOCTYPE html>
         header{padding:.85rem 1.5rem;background:rgba(10,10,15,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;gap:.3rem}
         .logo{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#fff 0%,var(--accent) 60%,#ff6b35 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         #file-name{font-size:.78rem;color:var(--txt2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92vw;text-align:center}
-        .container{flex:1;display:flex;flex-direction:column;align-items:center;padding:1.8rem 1rem 2.5rem;width:100%;max-width:1100px;margin:0 auto}
-        .live-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.35);padding:.28rem .9rem;border-radius:30px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1.2rem}
+        .container{flex:1;display:flex;flex-direction:column;align-items:center;padding:1.4rem 1rem 2.5rem;width:100%;max-width:1100px;margin:0 auto}
+        .live-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.35);padding:.28rem .9rem;border-radius:30px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
         .live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
         @keyframes pulse{50%{opacity:.3;box-shadow:none}}
 
-        /* Player */
+        /* ── Player ── */
         .player-wrap{width:100%;position:relative;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);background:#000;aspect-ratio:16/9}
         .video-js{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;border-radius:16px}
-        .vjs-theme-ft .vjs-control-bar{background:linear-gradient(to top,rgba(0,0,0,.85) 0%,transparent 100%);height:3.8em}
+        .vjs-theme-ft .vjs-control-bar{background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 100%);height:3.8em}
         .vjs-theme-ft .vjs-play-progress,.vjs-theme-ft .vjs-volume-level{background:var(--accent)}
+        .vjs-theme-ft .vjs-load-progress{background:rgba(229,9,20,.25)}
         .vjs-theme-ft .vjs-slider{background:rgba(255,255,255,.2)}
         .vjs-theme-ft .vjs-big-play-button{background:rgba(229,9,20,.85)!important;border:none!important;border-radius:50%!important;width:64px!important;height:64px!important;line-height:64px!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;transition:background .2s,transform .2s!important}
         .vjs-theme-ft:hover .vjs-big-play-button{background:var(--accent)!important;transform:translate(-50%,-50%) scale(1.08)!important}
-        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu .vjs-menu-content{background:rgba(12,12,18,.97);border:1px solid var(--border);border-radius:8px;max-height:200px}
-        .vjs-theme-ft .vjs-menu li{font-size:.8rem;padding:.45rem .9rem}
-        .vjs-theme-ft .vjs-menu li.vjs-selected,.vjs-theme-ft .vjs-menu li.vjs-selected:focus{color:var(--accent);font-weight:700}
-        .vjs-theme-ft .vjs-menu li:hover{background:rgba(229,9,20,.15)}
-        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu{margin-bottom:2em}
-        /* Audio/subtitle button highlight when active */
-        .vjs-theme-ft .vjs-audio-button .vjs-icon-placeholder::before,
-        .vjs-theme-ft .vjs-subs-caps-button .vjs-icon-placeholder::before{color:rgba(255,255,255,.8)}
-        .vjs-theme-ft .vjs-audio-button:hover .vjs-icon-placeholder::before,
-        .vjs-theme-ft .vjs-subs-caps-button:hover .vjs-icon-placeholder::before{color:#fff}
-        /* Subtitle cue styling */
+        /* Video.js menus */
+        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu .vjs-menu-content{background:rgba(12,12,20,.97);border:1px solid var(--border);border-radius:10px;max-height:220px;padding:4px 0}
+        .vjs-theme-ft .vjs-menu li{font-size:.8rem;padding:.48rem 1rem;color:var(--txt2)}
+        .vjs-theme-ft .vjs-menu li.vjs-selected{color:var(--accent);font-weight:700}
+        .vjs-theme-ft .vjs-menu li:hover{background:rgba(229,9,20,.15);color:#fff}
+        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu{margin-bottom:2.2em}
+        /* Subtitle cues */
         .vjs-text-track-display{font-family:Inter,sans-serif!important}
         ::cue{background:rgba(0,0,0,.78);color:#fff;font-size:1.05em;font-family:Inter,sans-serif}
 
-        /* Error overlay */
+        /* ── Error overlay ── */
         #vidErr{display:none;position:absolute;inset:0;z-index:99;background:rgba(10,10,15,.94);border-radius:16px;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}
         #vidErr.show{display:flex}
-        #vidErr svg{color:rgba(255,255,255,.45);margin-bottom:1rem}
+        #vidErr svg{color:rgba(255,255,255,.4);margin-bottom:1rem}
         #vidErr h2{font-size:1.3rem;font-weight:800;margin-bottom:.5rem}
         #vidErr p{font-size:.85rem;color:var(--txt2);line-height:1.55}
 
+        /* ── Controls panel below player ── */
+        .controls-panel{width:100%;margin-top:.9rem;display:flex;flex-direction:column;gap:.7rem}
+
+        /* Seek row */
+        .seek-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+        .seek-btn{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:.72rem;border-radius:10px;border:none;font-family:Inter,sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;color:#fff;background:var(--card2);border:1px solid var(--border);transition:background .18s,transform .15s}
+        .seek-btn:hover{background:rgba(255,255,255,.08)}
+        .seek-btn:active{transform:scale(.96)}
+
+        /* Track selectors row */
+        .track-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+        .track-select-wrap{display:flex;flex-direction:column;gap:.3rem}
+        .track-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);padding-left:.2rem}
+        .track-select{width:100%;padding:.62rem .8rem;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:#fff;font-family:Inter,sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .7rem center;padding-right:2rem;transition:border-color .18s}
+        .track-select:focus{outline:none;border-color:rgba(229,9,20,.5)}
+        .track-select:disabled{opacity:.4;cursor:not-allowed}
+        .track-select option{background:#1e1e2a;color:#fff}
+
         /* Download button */
-        .btn-area{margin-top:1.1rem;width:100%}
         .btn-dl{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.82rem 1.2rem;border-radius:10px;border:none;font-family:Inter,sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;text-decoration:none;color:#fff;background:linear-gradient(135deg,#4f46e5,#818cf8);box-shadow:0 4px 14px rgba(99,102,241,.35);transition:transform .18s,filter .18s}
         .btn-dl:hover{transform:scale(1.02);filter:brightness(1.1)}
         .btn-dl:active{transform:scale(.97)}
@@ -2146,7 +2160,10 @@ watch_tmplt = """<!DOCTYPE html>
         footer{padding:.8rem 1.5rem;text-align:center;color:var(--txt2);font-size:.72rem;margin-top:auto}
         .ha-link{color:var(--accent);text-decoration:none;font-weight:600}
 
-        @media(max-width:600px){.container{padding:1rem .75rem 2rem}}
+        @media(max-width:600px){
+            .container{padding:1rem .75rem 2rem}
+            .track-row,.seek-row{grid-template-columns:1fr 1fr}
+        }
     </style>
 </head>
 <body>
@@ -2156,6 +2173,8 @@ watch_tmplt = """<!DOCTYPE html>
 </header>
 <div class="container">
     <div class="live-badge"><span class="live-dot"></span>ONLINE STREAM</div>
+
+    <!-- Player -->
     <div class="player-wrap">
         <video id="mainPlayer"
                class="video-js vjs-theme-ft vjs-big-play-centered"
@@ -2171,7 +2190,43 @@ watch_tmplt = """<!DOCTYPE html>
             <p>The stream could not start. Try downloading the file below.</p>
         </div>
     </div>
-    <div class="btn-area">
+
+    <!-- Controls panel -->
+    <div class="controls-panel">
+
+        <!-- Seek ±10s -->
+        <div class="seek-row">
+            <button class="seek-btn" id="seekBack" type="button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/>
+                </svg>
+                -10s
+            </button>
+            <button class="seek-btn" id="seekFwd" type="button">
+                +10s
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Audio + Subtitle selectors -->
+        <div class="track-row">
+            <div class="track-select-wrap">
+                <span class="track-label">&#127911; Audio Track</span>
+                <select class="track-select" id="audioSelect" disabled>
+                    <option value="">Default</option>
+                </select>
+            </div>
+            <div class="track-select-wrap">
+                <span class="track-label">&#128250; Subtitles</span>
+                <select class="track-select" id="subSelect">
+                    <option value="off">Off</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Download -->
         <a id="dlBtn" href="{src}" class="btn-dl" download>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -2182,9 +2237,11 @@ watch_tmplt = """<!DOCTYPE html>
         </a>
     </div>
 </div>
+
 <footer>
     <p>Powered by <a href="https://t.me/FT_Channels" class="ha-link" target="_blank" rel="noopener">Filmotainment</a></p>
 </footer>
+
 <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
 <script>
 (function() {
@@ -2198,6 +2255,15 @@ watch_tmplt = """<!DOCTYPE html>
         if (e) e.classList.add("show");
     }
 
+    /* ── Seek buttons ── */
+    document.getElementById("seekBack").addEventListener("click", function() {
+        if (window._vjsPlayer) window._vjsPlayer.currentTime(Math.max(0, window._vjsPlayer.currentTime() - 10));
+    });
+    document.getElementById("seekFwd").addEventListener("click", function() {
+        if (window._vjsPlayer) window._vjsPlayer.currentTime(Math.min(window._vjsPlayer.duration() || 1e9, window._vjsPlayer.currentTime() + 10));
+    });
+
+    /* ── Init Video.js ── */
     var player = videojs("mainPlayer", {
         fluid: false,
         fill: true,
@@ -2219,27 +2285,82 @@ watch_tmplt = """<!DOCTYPE html>
                 "remainingTimeDisplay",
                 "customControlSpacer",
                 "playbackRateMenuButton",
-                "audioTrackButton",
-                "subsCapsButton",
                 "pictureInPictureToggle",
                 "fullscreenToggle"
             ]
         }
     });
+    window._vjsPlayer = player;
 
     player.src({ src: SRC, type: "video/mp4" });
 
     player.ready(function() {
-        var audio = player.audioTracks();
-        var subs  = player.textTracks();
-        // Label audio tracks if unlabeled
-        for (var i = 0; i < audio.length; i++) {
-            if (!audio[i].label) audio[i].label = "Track " + (i + 1);
+        /* ── Populate audio track selector ── */
+        var audioTracks = player.audioTracks();
+        var audioSel = document.getElementById("audioSelect");
+
+        function refreshAudioTracks() {
+            audioSel.innerHTML = "";
+            var count = audioTracks.length;
+            for (var i = 0; i < count; i++) {
+                var t = audioTracks[i];
+                var opt = document.createElement("option");
+                opt.value = i;
+                opt.textContent = t.label || t.language || ("Track " + (i + 1));
+                if (t.enabled) opt.selected = true;
+                audioSel.appendChild(opt);
+            }
+            if (count > 1) {
+                audioSel.disabled = false;
+            } else {
+                audioSel.disabled = false;
+                if (count === 0) {
+                    var opt = document.createElement("option");
+                    opt.value = ""; opt.textContent = "Default";
+                    audioSel.appendChild(opt);
+                }
+            }
         }
-        // Enable first subtitle track if only one exists
-        if (subs.length === 1 && subs[0].kind !== "metadata") {
-            subs[0].mode = "showing";
+
+        refreshAudioTracks();
+        audioTracks.addEventListener("change", refreshAudioTracks);
+
+        audioSel.addEventListener("change", function() {
+            var idx = parseInt(this.value);
+            for (var i = 0; i < audioTracks.length; i++) {
+                audioTracks[i].enabled = (i === idx);
+            }
+        });
+
+        /* ── Populate subtitle selector ── */
+        var textTracks = player.textTracks();
+        var subSel = document.getElementById("subSelect");
+
+        function refreshSubTracks() {
+            subSel.innerHTML = "<option value='off'>Off</option>";
+            var added = 0;
+            for (var i = 0; i < textTracks.length; i++) {
+                var t = textTracks[i];
+                if (t.kind === "metadata" || t.kind === "chapters") continue;
+                var opt = document.createElement("option");
+                opt.value = i;
+                opt.textContent = t.label || t.language || ("Sub " + (added + 1));
+                if (t.mode === "showing") opt.selected = true;
+                subSel.appendChild(opt);
+                added++;
+            }
         }
+
+        refreshSubTracks();
+        textTracks.addEventListener("change", refreshSubTracks);
+
+        subSel.addEventListener("change", function() {
+            var val = this.value;
+            for (var i = 0; i < textTracks.length; i++) {
+                if (textTracks[i].kind === "metadata") continue;
+                textTracks[i].mode = (String(i) === val) ? "showing" : "hidden";
+            }
+        });
     });
 
     player.on("error", function() {
