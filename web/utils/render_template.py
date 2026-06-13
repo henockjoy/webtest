@@ -1168,7 +1168,7 @@ function renderRow(containerId, items) {
         card.className = 'poster-card';
         card.style.animationDelay = `${i * 0.04}s`;
         const posterHTML = item.poster
-            ? `<img class="poster-img" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+            ? `<img class="poster-img" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&apos;poster-placeholder&apos;>&#127916;</div>'">`
             : `<div class="poster-placeholder">🎬</div>`;
         card.innerHTML = `
             <div class="poster-img-wrap">
@@ -1297,7 +1297,7 @@ function renderTodayReleasedRow(filter) {
         card.style.animationDelay = `${i * 0.04}s`;
         const posterSrc = item.poster || item.image || null;
         const posterHTML = posterSrc
-            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(item.title || item.name || '')}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(item.title || item.name || '')}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&apos;poster-placeholder&apos;>&#127916;</div>'">`
             : `<div class="poster-placeholder">🎬</div>`;
         const typeStr = item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie');
         let epText = '';
@@ -1345,7 +1345,7 @@ function renderRecentlyAdded(files) {
         card.style.animationDelay = `${i * 0.03}s`;
         const posterSrc = file.poster || null;
         const posterHTML = posterSrc
-            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&apos;poster-placeholder&apos;>&#127916;</div>'">`
             : `<div class="poster-placeholder">🎬</div>`;
         let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
         let epText = '';
@@ -1459,7 +1459,7 @@ async function doSearch(q) {
             card.className = 'poster-card';
             card.style.animationDelay = `${Math.min(idx * 0.04, 0.5)}s`;
             const posterHTML = item.poster
-                ? `<img class="poster-img" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder\\'>🎬</div>'">`
+                ? `<img class="poster-img" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&apos;poster-placeholder&apos;>&#127916;</div>'">`
                 : `<div class="poster-placeholder">🎬</div>`;
             card.innerHTML = `
                 <div class="poster-img-wrap">
