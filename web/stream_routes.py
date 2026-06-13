@@ -477,19 +477,33 @@ async def stream_file_handler(request):
 
 @routes.get("/api/tracks/{message_id}")
 async def tracks_handler(request):
-    """Use ffprobe to extract audio and subtitle track info from the stream URL."""
-    import asyncio, subprocess, json as _json, urllib.parse as _up
+    """Extract audio and subtitle track info using ffprobe on just the first few MB of the stream."""
+    import asyncio, subprocess, json as _json, urllib.parse as _up, shutil
     try:
         message_id = int(request.match_info['message_id'])
+
+        # Check if ffprobe is available at all
+        if not shutil.which("ffprobe"):
+            return web.json_response({"audio": [], "subtitles": [], "error": "ffprobe not available"})
+
         stream_url = _up.urljoin(URL, f"download/{message_id}")
 
+        # Use -probesize and -analyzeduration to limit how much data ffprobe reads
         proc = await asyncio.create_subprocess_exec(
-            "ffprobe", "-v", "quiet", "-print_format", "json",
-            "-show_streams", "-select_streams", "a:s",
+            "ffprobe",
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_streams",
+            "-probesize", "5000000",       # only read first 5 MB
+            "-analyzeduration", "500000",  # 0.5 second analysis
             stream_url,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return web.json_response({"audio": [], "subtitles": [], "error": "ffprobe timeout"})
 
         data = _json.loads(stdout.decode()) if stdout else {}
         streams = data.get("streams", [])
