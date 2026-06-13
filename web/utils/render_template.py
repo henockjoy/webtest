@@ -24,8 +24,8 @@ webapp_template = """
             --card: #16161f;
             --card2: #1e1e2a;
             --border: rgba(255,255,255,0.07);
-            --accent: #e50914;
-            --accent2: #ff6b35;
+            --accent: #0ea5e9;
+            --accent2: #38bdf8;
             --gold: #f5c518;
             --text: #ffffff;
             --text2: #b0b0c0;
@@ -70,7 +70,7 @@ webapp_template = """
             padding: 0 12px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
             cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
         }
-        .nav-search-pill:hover { background: var(--card2); border-color: rgba(229,9,20,0.35); color: #fff; }
+        .nav-search-pill:hover { background: var(--card2); border-color: rgba(14,165,233,0.35); color: #fff; }
         .nav-search-pill svg { flex: 0 0 auto; color: var(--text3); }
         .nav-search-pill span {
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -107,8 +107,8 @@ webapp_template = """
             transition: border-color 0.25s, box-shadow 0.25s;
         }
         .search-field-wrap:focus-within {
-            border-color: rgba(229, 9, 20, 0.4);
-            box-shadow: 0 0 14px rgba(229, 9, 20, 0.25);
+            border-color: rgba(14, 165, 233, 0.4);
+            box-shadow: 0 0 14px rgba(14, 165, 233, 0.25);
         }
         .search-field-wrap svg { color: var(--text3); flex-shrink: 0; }
         .search-field {
@@ -240,9 +240,9 @@ webapp_template = """
             border: none; cursor: pointer;
             transition: background 0.25s, transform 0.15s, box-shadow 0.25s;
             text-transform: uppercase; letter-spacing: 0.5px;
-            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.3);
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
         }
-        .hero-btn:hover { background: #ff0f1b; box-shadow: 0 6px 20px rgba(229, 9, 20, 0.45); }
+        .hero-btn:hover { background: #38bdf8; box-shadow: 0 6px 20px rgba(14, 165, 233, 0.45); }
         .hero-btn:active { transform: scale(0.97); }
         .hero-dots {
             display: flex; gap: 6px; margin-top: 16px;
@@ -284,12 +284,12 @@ webapp_template = """
             scroll-padding: 0 16px;
             cursor: grab;
             scrollbar-width: thin;
-            scrollbar-color: rgba(229,9,20,0.4) transparent;
+            scrollbar-color: rgba(14,165,233,0.4) transparent;
         }
         .poster-scroll:active { cursor: grabbing; }
         .poster-scroll::-webkit-scrollbar { height: 4px; }
         .poster-scroll::-webkit-scrollbar-track { background: transparent; }
-        .poster-scroll::-webkit-scrollbar-thumb { background: rgba(229,9,20,0.4); border-radius: 2px; }
+        .poster-scroll::-webkit-scrollbar-thumb { background: rgba(14,165,233,0.4); border-radius: 2px; }
         @media (pointer: coarse) {
             .poster-scroll { scrollbar-width: none; }
             .poster-scroll::-webkit-scrollbar { display: none; }
@@ -315,7 +315,7 @@ webapp_template = """
             transition: border-color 0.3s ease;
         }
         .poster-card:hover .poster-img-wrap {
-            border-color: rgba(229, 9, 20, 0.4);
+            border-color: rgba(14, 165, 233, 0.4);
         }
         .poster-img {
             width: 100%; height: 100%; object-fit: cover;
@@ -505,8 +505,8 @@ webapp_template = """
         }
         .file-item:last-child { border-bottom: none; }
         .file-item:hover { background: var(--card2); transform: translateX(2px); }
-        .file-item:active { background: rgba(229,9,20,0.1); transform: scale(0.99); }
-        .file-item.selected { background: rgba(229,9,20,0.14); border-color: rgba(229,9,20,0.38); }
+        .file-item:active { background: rgba(14,165,233,0.1); transform: scale(0.99); }
+        .file-item.selected { background: rgba(14,165,233,0.14); border-color: rgba(14,165,233,0.38); }
         
         /* Genre pills in modal */
         .modal-genres {
@@ -533,7 +533,7 @@ webapp_template = """
         .file-item-size { font-size: 11px; color: var(--text3); font-weight: 500; }
         .file-item-get {
             width: 30px; height: 30px; flex-shrink: 0;
-            background: rgba(229,9,20,0.15); border-radius: 50%;
+            background: rgba(14,165,233,0.15); border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             color: var(--accent);
         }
@@ -554,7 +554,7 @@ webapp_template = """
         }
         .season-btn.active {
             background: var(--accent); color: #fff;
-            border-color: rgba(229,9,20,0.75);
+            border-color: rgba(14,165,233,0.75);
         }
         .episode-panel { display: flex; flex-direction: column; gap: 4px; }
         .episode-kicker {
@@ -564,10 +564,10 @@ webapp_template = """
         }
         .episode-number {
             width: 38px; height: 38px; border-radius: var(--radius-sm);
-            background: rgba(229,9,20,0.13); color: var(--accent);
+            background: rgba(14,165,233,0.13); color: var(--accent);
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0; font-size: 12px; font-weight: 800;
-            border: 1px solid rgba(229,9,20,0.18);
+            border: 1px solid rgba(14,165,233,0.18);
         }
         .modal-loading {
             text-align: center; padding: 40px 20px; color: var(--text3);
@@ -729,7 +729,7 @@ webapp_template = """
         }
         .today-ep-badge {
             display: inline-flex; align-items: center; gap: 5px;
-            background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.3);
+            background: rgba(14,165,233,0.15); border: 1px solid rgba(14,165,233,0.3);
             color: var(--accent); font-size: 11px; font-weight: 800;
             padding: 3px 8px; border-radius: 6px; margin-bottom: 5px;
             letter-spacing: 0.2px;
@@ -756,7 +756,7 @@ webapp_template = """
 
         /* Today Airing nav button */
         .nav-today-btn {
-            background: rgba(229,9,20,0.12); border: 1px solid rgba(229,9,20,0.3);
+            background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.3);
             color: var(--accent); border-radius: 8px;
             padding: 0 10px; height: 40px;
             display: flex; align-items: center; gap: 6px;
@@ -765,7 +765,7 @@ webapp_template = """
             transition: background 0.2s, border-color 0.2s;
             letter-spacing: 0.2px;
         }
-        .nav-today-btn:hover { background: rgba(229,9,20,0.22); border-color: rgba(229,9,20,0.5); }
+        .nav-today-btn:hover { background: rgba(14,165,233,0.22); border-color: rgba(14,165,233,0.5); }
         .nav-today-dot {
             width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
             box-shadow: 0 0 8px var(--accent);
@@ -776,7 +776,7 @@ webapp_template = """
         /* ── RECENTLY ADDED ROW ── */
         .live-badge {
             display: inline-flex; align-items: center; gap: 5px;
-            background: rgba(229,9,20,.14); border: 1px solid rgba(229,9,20,.32);
+            background: rgba(14,165,233,.14); border: 1px solid rgba(14,165,233,.32);
             color: var(--accent); font-size: 9px; font-weight: 800;
             letter-spacing: .08em; text-transform: uppercase;
             padding: 2px 8px; border-radius: 20px; flex-shrink: 0;
@@ -2038,26 +2038,26 @@ no_tmdb_template = """
             font-family:'Outfit',sans-serif; background:#0a0a0f; color:#fff;
             min-height:100vh; display:flex; align-items:center; justify-content:center;
             padding:30px 24px; text-align:center;
-            background-image: radial-gradient(ellipse at 50% 0%, rgba(229,9,20,0.08) 0%, transparent 60%);
+            background-image: radial-gradient(ellipse at 50% 0%, rgba(14,165,233,0.08) 0%, transparent 60%);
         }
         .wrap { max-width:380px; }
         .icon {
             width:90px; height:90px; border-radius:24px; margin:0 auto 28px;
             background:linear-gradient(135deg,#1a1a2e,#16213e);
-            border:1px solid rgba(229,9,20,0.3);
+            border:1px solid rgba(14,165,233,0.3);
             display:flex; align-items:center; justify-content:center; font-size:40px;
-            box-shadow: 0 0 40px rgba(229,9,20,0.1);
+            box-shadow: 0 0 40px rgba(14,165,233,0.1);
         }
         h1 { font-size:26px; font-weight:800; margin-bottom:12px; letter-spacing:-0.5px; }
         p { font-size:15px; color:#888; line-height:1.7; }
         code {
-            display:inline-block; background:#1e1e2a; color:#e50914;
+            display:inline-block; background:#1e1e2a; color:#0ea5e9;
             padding:3px 10px; border-radius:6px; font-size:14px;
-            border:1px solid rgba(229,9,20,0.25); margin:4px 0;
+            border:1px solid rgba(14,165,233,0.25); margin:4px 0;
             font-family:monospace;
         }
         .divider {
-            width:60px; height:2px; background:linear-gradient(90deg,transparent,#e50914,transparent);
+            width:60px; height:2px; background:linear-gradient(90deg,transparent,#0ea5e9,transparent);
             margin:24px auto;
         }
         .note { font-size:12px; color:#444; margin-top:16px; }
@@ -2071,7 +2071,7 @@ no_tmdb_template = """
     <p>The WebApp requires a <b>TMDB API Key</b> to function.</p>
     <p style="margin-top:12px">If you're an admin, set the environment variable:</p>
     <p style="margin-top:10px"><code>TMDB_API_KEY</code></p>
-    <p style="margin-top:14px; color:#555">Get your free API key at<br><span style="color:#e50914">themoviedb.org/settings/api</span></p>
+    <p style="margin-top:14px; color:#555">Get your free API key at<br><span style="color:#0ea5e9">themoviedb.org/settings/api</span></p>
     <div class="note">This message is only shown when the key is not configured.</div>
 </div>
 <script>
@@ -2094,17 +2094,17 @@ watch_tmplt = """<!DOCTYPE html>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --accent:#e50914; --bg:#0a0a0f; --border:rgba(255,255,255,.07);
+            --accent:#0ea5e9; --bg:#0a0a0f; --border:rgba(255,255,255,.07);
             --txt:#fff; --txt2:#94a3b8; --card:#16161f; --card2:#1e1e2a;
         }
         *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
         body{font-family:Inter,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
-        body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 50% at 10% 20%,rgba(229,9,20,.08) 0%,transparent 60%),linear-gradient(160deg,#0a0a0f 0%,#111118 100%)}
+        body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 50% at 10% 20%,rgba(14,165,233,.08) 0%,transparent 60%),linear-gradient(160deg,#0a0a0f 0%,#111118 100%)}
         header{padding:.85rem 1.5rem;background:rgba(10,10,15,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;gap:.3rem}
-        .logo{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#fff 0%,var(--accent) 60%,#ff6b35 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .logo{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#fff 0%,var(--accent) 60%,#38bdf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         #file-name{font-size:.78rem;color:var(--txt2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92vw;text-align:center}
         .container{flex:1;display:flex;flex-direction:column;align-items:center;padding:1.4rem 1rem 2.5rem;width:100%;max-width:1100px;margin:0 auto}
-        .live-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(229,9,20,.12);border:1px solid rgba(229,9,20,.35);padding:.28rem .9rem;border-radius:30px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+        .live-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.35);padding:.28rem .9rem;border-radius:30px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
         .live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
         @keyframes pulse{50%{opacity:.3;box-shadow:none}}
 
@@ -2113,15 +2113,15 @@ watch_tmplt = """<!DOCTYPE html>
         .video-js{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;border-radius:16px}
         .vjs-theme-ft .vjs-control-bar{background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 100%);height:3.8em}
         .vjs-theme-ft .vjs-play-progress,.vjs-theme-ft .vjs-volume-level{background:var(--accent)}
-        .vjs-theme-ft .vjs-load-progress{background:rgba(229,9,20,.25)}
+        .vjs-theme-ft .vjs-load-progress{background:rgba(14,165,233,.25)}
         .vjs-theme-ft .vjs-slider{background:rgba(255,255,255,.2)}
-        .vjs-theme-ft .vjs-big-play-button{background:rgba(229,9,20,.85)!important;border:none!important;border-radius:50%!important;width:64px!important;height:64px!important;line-height:64px!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;transition:background .2s,transform .2s!important}
+        .vjs-theme-ft .vjs-big-play-button{background:rgba(14,165,233,.85)!important;border:none!important;border-radius:50%!important;width:64px!important;height:64px!important;line-height:64px!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;transition:background .2s,transform .2s!important}
         .vjs-theme-ft:hover .vjs-big-play-button{background:var(--accent)!important;transform:translate(-50%,-50%) scale(1.08)!important}
         /* Video.js menus */
         .vjs-theme-ft .vjs-menu-button-popup .vjs-menu .vjs-menu-content{background:rgba(12,12,20,.97);border:1px solid var(--border);border-radius:10px;max-height:220px;padding:4px 0}
         .vjs-theme-ft .vjs-menu li{font-size:.8rem;padding:.48rem 1rem;color:var(--txt2)}
         .vjs-theme-ft .vjs-menu li.vjs-selected{color:var(--accent);font-weight:700}
-        .vjs-theme-ft .vjs-menu li:hover{background:rgba(229,9,20,.15);color:#fff}
+        .vjs-theme-ft .vjs-menu li:hover{background:rgba(14,165,233,.15);color:#fff}
         .vjs-theme-ft .vjs-menu-button-popup .vjs-menu{margin-bottom:2.2em}
         /* Subtitle cues */
         .vjs-text-track-display{font-family:Inter,sans-serif!important}
@@ -2148,7 +2148,7 @@ watch_tmplt = """<!DOCTYPE html>
         .track-select-wrap{display:flex;flex-direction:column;gap:.3rem}
         .track-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);padding-left:.2rem}
         .track-select{width:100%;padding:.62rem .8rem;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:#fff;font-family:Inter,sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .7rem center;padding-right:2rem;transition:border-color .18s}
-        .track-select:focus{outline:none;border-color:rgba(229,9,20,.5)}
+        .track-select:focus{outline:none;border-color:rgba(14,165,233,.5)}
         .track-select:disabled{opacity:.4;cursor:not-allowed}
         .track-select option{background:#1e1e2a;color:#fff}
 
