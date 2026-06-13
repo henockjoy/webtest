@@ -899,7 +899,7 @@ async def today_airing_handler(request):
 
 
 async def media_download(request, message_id: int):
-    range_header = request.headers.get('Range', 0)
+    range_header = request.headers.get('Range', '')
     media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
     media = getattr(media_msg, media_msg.media.value, None)
     file_size = media.file_size
@@ -909,10 +909,13 @@ async def media_download(request, message_id: int):
         from_bytes = int(from_bytes)
         until_bytes = int(until_bytes) if until_bytes else file_size - 1
     else:
-        from_bytes = request.http_range.start or 0
-        until_bytes = request.http_range.stop or file_size - 1
+        from_bytes = 0
+        until_bytes = file_size - 1
 
-    req_length = until_bytes - from_bytes
+    # Clamp to valid range
+    from_bytes = max(0, min(from_bytes, file_size - 1))
+    until_bytes = max(from_bytes, min(until_bytes, file_size - 1))
+    req_length = until_bytes - from_bytes + 1
 
     new_chunk_size = await chunk_size(req_length)
     offset = await offset_fix(from_bytes, new_chunk_size)
@@ -923,9 +926,9 @@ async def media_download(request, message_id: int):
                                       new_chunk_size)
 
     file_name = media.file_name if media.file_name \
-        else f"{secrets.token_hex(2)}.jpeg"
+        else f"{secrets.token_hex(2)}.mp4"
     mime_type = media.mime_type if media.mime_type \
-        else f"{mimetypes.guess_type(file_name)}"
+        else mimetypes.guess_type(file_name)[0] or 'video/mp4'
 
     return_resp = web.Response(
         status=206 if range_header else 200,
@@ -933,12 +936,10 @@ async def media_download(request, message_id: int):
         headers={
             "Content-Type": mime_type,
             "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
-            "Content-Disposition": f'attachment; filename="{file_name}"',
+            "Content-Length": str(req_length),
+            "Content-Disposition": f'inline; filename="{file_name}"',
             "Accept-Ranges": "bytes",
         }
     )
-
-    if return_resp.status == 200:
-        return_resp.headers.add("Content-Length", str(file_size))
 
     return return_resp
