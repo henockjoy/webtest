@@ -1,4 +1,4 @@
-import math
+import mathf
 from typing import Union
 from pyrogram.types import Message
 from utils import temp
