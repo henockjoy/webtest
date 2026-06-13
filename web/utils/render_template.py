@@ -2459,7 +2459,7 @@ watch_tmplt = """<!DOCTYPE html>
                     audioSel.appendChild(opt);
                 });
                 audioSel.disabled = false;
-                document.querySelector(".track-select-wrap:first-child .track-label").textContent = "\uD83C\uDFA7 Audio (" + audioTracks.length + " tracks)";
+                document.querySelector(".track-select-wrap:first-child .track-label").textContent = "Audio (" + audioTracks.length + " tracks)";
             } else {
                 audioSel.innerHTML = "<option value=''>Default</option>";
                 audioSel.disabled = true;
@@ -2475,7 +2475,7 @@ watch_tmplt = """<!DOCTYPE html>
                     opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
                     subSel.appendChild(opt);
                 });
-                document.querySelector(".track-select-wrap:last-child .track-label").textContent = "\uD83D\uDCFA Subtitles (" + subTracks.length + " found)";
+                document.querySelector(".track-select-wrap:last-child .track-label").textContent = "Subtitles (" + subTracks.length + " found)";
             } else {
                 var opt = document.createElement("option");
                 opt.value = ""; opt.disabled = true;
