@@ -37,7 +37,16 @@ class TGCustomYield:
         data = await self.generate_file_properties(msg)
         media_session = client.media_sessions.get(data.dc_id, None)
         if media_session is None:
-            media_session = await client.get_session(dc_id=data.dc_id, is_media=True)
+            for attempt in range(3):
+                try:
+                    media_session = await client.get_session(dc_id=data.dc_id, is_media=True)
+                    break
+                except AuthBytesInvalid:
+                    # Remove the broken session so the next attempt creates a fresh one
+                    client.media_sessions.pop(data.dc_id, None)
+                    if attempt == 2:
+                        raise
+            client.media_sessions[data.dc_id] = media_session
         return media_session
 
     @staticmethod
@@ -88,7 +97,16 @@ class TGCustomYield:
                          last_part_cut: int, part_count: int, chunk_size: int):
         client = self.main_bot
         data = await self.generate_file_properties(media_msg)
-        media_session = await self.generate_media_session(client, media_msg)
+
+        # Retry session creation up to 3 times on AuthBytesInvalid
+        for attempt in range(3):
+            try:
+                media_session = await self.generate_media_session(client, media_msg)
+                break
+            except AuthBytesInvalid:
+                client.media_sessions.pop(data.dc_id, None)
+                if attempt == 2:
+                    return  # give up, stream will end gracefully
 
         current_part = 1
 
