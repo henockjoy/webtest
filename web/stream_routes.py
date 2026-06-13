@@ -397,7 +397,7 @@ async def watch_handler(request):
     try:
         message_id = int(message_id_str)
     except (ValueError, TypeError):
-        return web.Response(text=error_tmplt, content_type='text/html', charset='utf-8')
+        return web.Response(body=error_tmplt.encode('utf-8'), content_type='text/html', charset='utf-8')
     try:
         page_html = await media_watch(message_id)
         return web.Response(
@@ -407,7 +407,30 @@ async def watch_handler(request):
         )
     except Exception as e:
         logger.error(f"[watch] media_watch threw for id={message_id}: {e}\n{_tb.format_exc()}")
-        return web.Response(text=error_tmplt, content_type='text/html', charset='utf-8')
+        return web.Response(body=error_tmplt.encode('utf-8'), content_type='text/html', charset='utf-8')
+
+
+@routes.get("/api/watch-test/{message_id}")
+async def watch_test_handler(request):
+    """Simulates watch_handler exactly and returns JSON with result or traceback."""
+    import traceback as _tb2
+    message_id = int(request.match_info['message_id'])
+    try:
+        page_html = await media_watch(message_id)
+        encoded = page_html.encode('utf-8')
+        return web.json_response({
+            "ok": True,
+            "html_len": len(page_html),
+            "encoded_len": len(encoded),
+            "title_snippet": page_html[page_html.find('<title>'):page_html.find('</title>')+8]
+        })
+    except Exception as e:
+        return web.json_response({
+            "ok": False,
+            "error": str(e),
+            "type": type(e).__name__,
+            "traceback": _tb2.format_exc()
+        })
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
