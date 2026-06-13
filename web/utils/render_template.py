@@ -2967,17 +2967,22 @@ payment_template = """
 # Backend helpers
 # ─────────────────────────────────────────────────────────────────────────────
 async def media_watch(message_id):
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
-    except Exception:
+    except Exception as e:
+        logger.error(f"[media_watch] get_messages failed for id={message_id}: {e}")
         return error_tmplt
 
     # Guard: message must exist and have media
     if not media_msg or not media_msg.media:
+        logger.warning(f"[media_watch] message {message_id} not found or has no media in BIN_CHANNEL={BIN_CHANNEL}")
         return error_tmplt
 
     media = getattr(media_msg, media_msg.media.value, None)
     if not media:
+        logger.warning(f"[media_watch] could not extract media object from message {message_id}")
         return error_tmplt
 
     src = urllib.parse.urljoin(URL, f'download/{message_id}')
