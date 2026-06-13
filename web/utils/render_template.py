@@ -3060,6 +3060,11 @@ async def media_watch(message_id):
     else:
         resolved_mime = _mt.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
 
+    # Browsers/Video.js reject non-standard MIME types like video/x-matroska before even
+    # trying to play. Use video/mp4 as the declared source type universally — the actual
+    # bytes and codec negotiation happen at the HTTP level regardless.
+    player_mime = 'video/mp4'
+
     file_name_safe = html.escape(file_name)
     heading   = html.escape(f'Watch \u2014 {file_name}')
 
@@ -3069,6 +3074,6 @@ async def media_watch(message_id):
              .replace('{heading}',    heading)
              .replace('{file_name}',  file_name_safe)
              .replace('{message_id}', str(message_id))
-             .replace('{mime_type}',  resolved_mime)
+             .replace('{mime_type}',  player_mime)
              .replace('{src}',        src))
     return html_
