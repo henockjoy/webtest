@@ -1,7 +1,9 @@
 import math
 import secrets
 import mimetypes
-from info import BIN_CHANNEL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+import urllib.parse
+import html
+from info import BIN_CHANNEL, URL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
 try:
     from info import OMDB_API_KEY
 except ImportError:
@@ -13,7 +15,7 @@ except ImportError:
 from utils import temp, get_size, handle_next_back, get_plan_name
 from aiohttp import web
 from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
-from web.utils.render_template import media_watch, error_tmplt, webapp_template, payment_template, no_tmdb_template
+from web.utils.render_template import media_watch, error_tmplt, watch_tmplt, webapp_template, payment_template, no_tmdb_template
 from database.ia_filterdb import get_search_results
 from database.users_chats_db import db
 import json, io, aiohttp
@@ -389,13 +391,76 @@ async def build_mal_details(session, mal_id):
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
-    import logging
+    import logging, traceback as _tb
     logger = logging.getLogger(__name__)
+    message_id_str = request.match_info.get('message_id', '')
     try:
-        message_id = int(request.match_info['message_id'])
-        return web.Response(text=await media_watch(message_id), content_type='text/html')
+        message_id = int(message_id_str)
+    except (ValueError, TypeError):
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 1: fetch message ──────────────────────────────────────────────
+    try:
+        media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
     except Exception as e:
-        logger.error(f"[watch_handler] unhandled error for message_id={request.match_info.get('message_id')}: {e}")
+        logger.error(f"[watch] get_messages failed id={message_id}: {e}\n{_tb.format_exc()}")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    if not media_msg or not media_msg.media:
+        logger.warning(f"[watch] id={message_id} empty message or no media")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 2: extract media object ──────────────────────────────────────
+    try:
+        media = getattr(media_msg, media_msg.media.value, None)
+    except Exception as e:
+        logger.error(f"[watch] getattr media failed id={message_id}: {e}")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    if not media:
+        logger.warning(f"[watch] id={message_id} media object is None")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 3: video check ───────────────────────────────────────────────
+    mime      = (getattr(media, 'mime_type', '') or '').strip()
+    file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
+    tag       = mime.split('/')[0].lower()
+    ext       = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
+    VIDEO_EXTS = {'mp4','mkv','avi','mov','wmv','flv','webm','m4v','ts','mpeg','mpg','3gp','ogv'}
+    is_video  = tag == 'video' or mime == 'application/octet-stream' or ext in VIDEO_EXTS
+
+    if not is_video:
+        logger.warning(f"[watch] id={message_id} not video: mime='{mime}' ext='{ext}'")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 4: build the watch page HTML ────────────────────────────────
+    try:
+        src           = urllib.parse.urljoin(URL, f'download/{message_id}')
+        file_name_safe = html.escape(file_name)
+        heading        = html.escape(f'Watch \u2014 {file_name}')
+        # Resolve the real MIME type (Telegram often sends octet-stream for MKV/AVI)
+        if mime and mime != 'application/octet-stream':
+            resolved_mime = mime
+        else:
+            mime_map = {
+                'mkv': 'video/x-matroska', 'avi': 'video/x-msvideo',
+                'mov': 'video/quicktime',  'wmv': 'video/x-ms-wmv',
+                'flv': 'video/x-flv',     'webm': 'video/webm',
+                'm4v': 'video/x-m4v',     'ts': 'video/mp2t',
+                'mpeg': 'video/mpeg',      'mpg': 'video/mpeg',
+                '3gp': 'video/3gpp',       'ogv': 'video/ogg',
+                'mp4': 'video/mp4',
+            }
+            resolved_mime = mimetypes.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
+        page_html = (watch_tmplt
+                     .replace('{heading}',    heading)
+                     .replace('{file_name}',  file_name_safe)
+                     .replace('{message_id}', str(message_id))
+                     .replace('{mime_type}',  resolved_mime)
+                     .replace('{src}',        src))
+        return web.Response(text=page_html, content_type='text/html')
+    except Exception as e:
+        logger.error(f"[watch] template render failed id={message_id}: {e}\n{_tb.format_exc()}")
         return web.Response(text=error_tmplt, content_type='text/html')
 
 @routes.get("/download/{message_id}")
@@ -418,7 +483,20 @@ async def stream_file_handler(request):
     """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}"""
     try:
         file_id = request.match_info['file_id']
-        msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
+        try:
+            msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
+        except Exception as e:
+            err_str = str(e).lower()
+            # FILE_REFERENCE_EXPIRED or similar — the stored file_id is stale
+            if 'file_reference' in err_str or 'invalid' in err_str or 'expired' in err_str:
+                import logging as _log
+                _log.getLogger(__name__).warning(f"[stream-file] file_id stale: {e}")
+                return web.Response(
+                    text=error_tmplt,
+                    content_type='text/html',
+                    status=410
+                )
+            raise
         raise web.HTTPFound(location=f"/watch/{msg.id}")
     except web.HTTPFound:
         raise
@@ -738,6 +816,18 @@ async def debug_watch_handler(request):
         result["steps"].append("is_video: " + str(is_video))
         if not is_video:
             result["steps"].append("FAIL: mime/ext check rejected the file")
+            return web.json_response(result)
+        # Now actually call media_watch to see if IT throws
+        result["steps"].append("calling media_watch...")
+        try:
+            html_out = await media_watch(message_id)
+            result["media_watch_returned_error_page"] = ("Something went wrong" in html_out or "We couldn't load" in html_out)
+            result["media_watch_html_length"] = len(html_out)
+            result["steps"].append("media_watch: returned html, length=" + str(len(html_out)))
+        except Exception as mw_err:
+            result["steps"].append(f"media_watch THREW: {mw_err}")
+            result["media_watch_exception"] = str(mw_err)
+            result["media_watch_traceback"] = traceback.format_exc()
     except Exception as e:
         result["steps"].append(f"EXCEPTION: {e}")
         result["traceback"] = traceback.format_exc()
