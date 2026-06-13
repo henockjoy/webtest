@@ -1250,6 +1250,8 @@ async def today_airing_handler(request):
 
 
 async def media_download(request, message_id: int):
+    import shutil as _shutil, subprocess as _sp, asyncio as _asyncio
+
     range_header = request.headers.get('Range', '')
     media_msg = await _get_cached_message(message_id)
 
@@ -1261,33 +1263,10 @@ async def media_download(request, message_id: int):
     if not media:
         raise web.HTTPNotFound(text=error_tmplt, content_type='text/html')
 
-    file_size = media.file_size
-
-    if range_header:
-        from_bytes, until_bytes = range_header.replace('bytes=', '').split('-')
-        from_bytes = int(from_bytes)
-        until_bytes = int(until_bytes) if until_bytes else file_size - 1
-    else:
-        from_bytes = 0
-        until_bytes = file_size - 1
-
-    # Clamp to valid range
-    from_bytes = max(0, min(from_bytes, file_size - 1))
-    until_bytes = max(from_bytes, min(until_bytes, file_size - 1))
-    req_length = until_bytes - from_bytes + 1
-
-    new_chunk_size = await chunk_size(req_length)
-    offset = await offset_fix(from_bytes, new_chunk_size)
-    first_part_cut = from_bytes - offset
-    last_part_cut = (until_bytes % new_chunk_size) + 1
-    part_count = math.ceil(req_length / new_chunk_size)
-    body = TGCustomYield().yield_file(media_msg, offset, first_part_cut, last_part_cut, part_count,
-                                      new_chunk_size)
-
     file_name = media.file_name if media.file_name \
         else f"{secrets.token_hex(2)}.mp4"
 
-    # Resolve mime — Telegram often sends MKV/AVI as application/octet-stream
+    # Resolve mime
     mime_type = media.mime_type if (media.mime_type and media.mime_type != 'application/octet-stream') \
         else mimetypes.guess_type(file_name)[0]
     if not mime_type:
@@ -1302,7 +1281,85 @@ async def media_download(request, message_id: int):
         }
         mime_type = mime_map.get(ext, 'video/mp4')
 
-    return_resp = web.Response(
+    # ── Audio/subtitle track selection via ffmpeg (if available) ────────────
+    audio_idx = request.rel_url.query.get('audio', None)
+    sub_idx   = request.rel_url.query.get('sub',   None)
+
+    ffmpeg_bin = _shutil.which('ffmpeg')
+    if ffmpeg_bin and (audio_idx is not None or sub_idx is not None):
+        # Build a streaming URL for ffmpeg to read from (our own /download/ endpoint
+        # without query params to avoid recursion)
+        stream_url = urllib.parse.urljoin(URL, f'download/{message_id}')
+
+        cmd = [
+            ffmpeg_bin,
+            '-loglevel', 'quiet',
+            '-i', stream_url,
+            '-map', '0:v:0',                         # always keep first video
+            '-map', f'0:a:{audio_idx or 0}',          # selected audio track
+        ]
+        if sub_idx is not None and sub_idx != 'off':
+            cmd += ['-map', f'0:s:{sub_idx}']
+
+        cmd += [
+            '-c', 'copy',         # no re-encoding — just remux
+            '-movflags', 'frag_keyframe+empty_moov+faststart',
+            '-f', 'mp4',          # output as fragmented MP4 (browser-compatible)
+            'pipe:1'
+        ]
+
+        async def ffmpeg_stream():
+            proc = await _asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=_sp.PIPE, stderr=_sp.DEVNULL
+            )
+            try:
+                while True:
+                    chunk = await proc.stdout.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+        return web.Response(
+            status=200,
+            body=ffmpeg_stream(),
+            headers={
+                'Content-Type': 'video/mp4',
+                'Content-Disposition': f'inline; filename="{file_name}"',
+                'Cache-Control': 'no-cache',
+                'X-Track-Audio': str(audio_idx),
+            }
+        )
+
+    # ── Default: direct Telegram stream (no ffmpeg / no track param) ────────
+    file_size = media.file_size
+
+    if range_header:
+        from_bytes, until_bytes = range_header.replace('bytes=', '').split('-')
+        from_bytes = int(from_bytes)
+        until_bytes = int(until_bytes) if until_bytes else file_size - 1
+    else:
+        from_bytes = 0
+        until_bytes = file_size - 1
+
+    from_bytes = max(0, min(from_bytes, file_size - 1))
+    until_bytes = max(from_bytes, min(until_bytes, file_size - 1))
+    req_length  = until_bytes - from_bytes + 1
+
+    new_chunk_size  = await chunk_size(req_length)
+    offset          = await offset_fix(from_bytes, new_chunk_size)
+    first_part_cut  = from_bytes - offset
+    last_part_cut   = (until_bytes % new_chunk_size) + 1
+    part_count      = math.ceil(req_length / new_chunk_size)
+    body = TGCustomYield().yield_file(media_msg, offset, first_part_cut, last_part_cut,
+                                      part_count, new_chunk_size)
+
+    return web.Response(
         status=206 if range_header else 200,
         body=body,
         headers={
@@ -1313,5 +1370,3 @@ async def media_download(request, message_id: int):
             "Accept-Ranges": "bytes",
         }
     )
-
-    return return_resp
