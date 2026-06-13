@@ -2440,15 +2440,59 @@ watch_tmplt = """<!DOCTYPE html>
 
     player.src({ src: SRC, type: "{mime_type}" });
 
-    /* ── Fetch track info from server (ffprobe) ── */
+    /* -- Track selectors -- */
     var audioSel = document.getElementById("audioSelect");
     var subSel   = document.getElementById("subSelect");
 
+    /* Populate audio selector from Video.js native audioTracks (works in Chrome/Edge for MKV/MP4) */
+    function populateNativeTracks() {
+        var vjsAudio = player.audioTracks();
+        if (vjsAudio && vjsAudio.length > 1) {
+            audioSel.innerHTML = "";
+            for (var i = 0; i < vjsAudio.length; i++) {
+                var t = vjsAudio[i];
+                var opt = document.createElement("option");
+                opt.value = i;
+                opt.textContent = t.label || t.language || ("Audio " + (i + 1));
+                if (t.enabled) opt.selected = true;
+                audioSel.appendChild(opt);
+            }
+            audioSel.disabled = false;
+            document.querySelector(".track-select-wrap:first-child .track-label").textContent =
+                "Audio (" + vjsAudio.length + " tracks)";
+        }
+
+        var vjsSubs = player.textTracks();
+        if (vjsSubs && vjsSubs.length > 0) {
+            subSel.innerHTML = "<option value='off'>Off</option>";
+            var count = 0;
+            for (var j = 0; j < vjsSubs.length; j++) {
+                var st = vjsSubs[j];
+                if (st.kind === "metadata" || st.kind === "chapters") continue;
+                var sopt = document.createElement("option");
+                sopt.value = j;
+                sopt.textContent = st.label || st.language || ("Sub " + (count + 1));
+                subSel.appendChild(sopt);
+                count++;
+            }
+            if (count > 0) {
+                document.querySelector(".track-select-wrap:last-child .track-label").textContent =
+                    "Subtitles (" + count + " found)";
+            }
+        }
+    }
+
+    /* Try native tracks once metadata is loaded, then again after canplay */
+    player.one("loadedmetadata", function() { setTimeout(populateNativeTracks, 300); });
+    player.one("canplay",        function() { setTimeout(populateNativeTracks, 300); });
+
+    /* Also try ffprobe endpoint as a fallback for servers that have ffprobe */
     fetch("/api/tracks/" + MSG_ID)
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            /* Audio tracks */
             var audioTracks = data.audio || [];
+            var subTracks   = data.subtitles || [];
+
             if (audioTracks.length > 1) {
                 audioSel.innerHTML = "";
                 audioTracks.forEach(function(t, i) {
@@ -2459,51 +2503,48 @@ watch_tmplt = """<!DOCTYPE html>
                     audioSel.appendChild(opt);
                 });
                 audioSel.disabled = false;
-                document.querySelector(".track-select-wrap:first-child .track-label").textContent = "Audio (" + audioTracks.length + " tracks)";
-            } else {
-                audioSel.innerHTML = "<option value=''>Default</option>";
-                audioSel.disabled = true;
+                document.querySelector(".track-select-wrap:first-child .track-label").textContent =
+                    "Audio (" + audioTracks.length + " tracks)";
             }
 
-            /* Subtitle tracks */
-            var subTracks = data.subtitles || [];
-            subSel.innerHTML = "<option value='off'>Off</option>";
             if (subTracks.length > 0) {
+                subSel.innerHTML = "<option value='off'>Off</option>";
                 subTracks.forEach(function(t) {
                     var opt = document.createElement("option");
                     opt.value = t.index;
                     opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
                     subSel.appendChild(opt);
                 });
-                document.querySelector(".track-select-wrap:last-child .track-label").textContent = "Subtitles (" + subTracks.length + " found)";
-            } else {
-                var opt = document.createElement("option");
-                opt.value = ""; opt.disabled = true;
-                opt.textContent = "None in file";
-                subSel.appendChild(opt);
+                document.querySelector(".track-select-wrap:last-child .track-label").textContent =
+                    "Subtitles (" + subTracks.length + " found)";
             }
         })
-        .catch(function() {
-            audioSel.innerHTML = "<option value=''>Default</option>";
-            audioSel.disabled = true;
-        });
+        .catch(function() { /* ffprobe not available, native tracks already handled */ });
 
-    /* Audio track switching via Video.js audioTracks API */
+    /* Audio switching */
     audioSel.addEventListener("change", function() {
         var vjsAudio = player.audioTracks();
-        var targetIdx = parseInt(this.value);
+        var targetVal = parseInt(this.value);
         for (var i = 0; i < vjsAudio.length; i++) {
-            vjsAudio[i].enabled = (vjsAudio[i].id == targetIdx || i === targetIdx);
+            vjsAudio[i].enabled = (i === targetVal);
         }
     });
 
-    /* Subtitle switching via Video.js textTracks API */
+    /* Subtitle switching */
     subSel.addEventListener("change", function() {
         var val = this.value;
+        if (val === "off") {
+            var vjsSubs = player.textTracks();
+            for (var i = 0; i < vjsSubs.length; i++) {
+                vjsSubs[i].mode = "hidden";
+            }
+            return;
+        }
         var vjsSubs = player.textTracks();
+        var targetIdx = parseInt(val);
         for (var i = 0; i < vjsSubs.length; i++) {
-            if (vjsSubs[i].kind === "metadata") continue;
-            vjsSubs[i].mode = (String(vjsSubs[i].id) === val || String(i) === val) ? "showing" : "hidden";
+            if (vjsSubs[i].kind === "metadata" || vjsSubs[i].kind === "chapters") continue;
+            vjsSubs[i].mode = (i === targetIdx) ? "showing" : "hidden";
         }
     });
 
@@ -2512,7 +2553,7 @@ watch_tmplt = """<!DOCTYPE html>
         showErr();
     });
 
-    /* ── Auto-rotate to landscape on fullscreen (mobile) ── */
+    /* -- Auto-rotate to landscape on fullscreen (mobile) -- */
     player.on("fullscreenchange", function() {
         if (player.isFullscreen()) {
             try {
