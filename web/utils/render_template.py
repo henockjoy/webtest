@@ -2438,14 +2438,78 @@ watch_tmplt = """<!DOCTYPE html>
     });
     window._vjsPlayer = player;
 
+    /* -- Track state -- */
+    var currentAudioIdx = 0;   // currently selected audio stream index
+    var tracksData = { audio: [], subtitles: [] };
+
     player.src({ src: SRC, type: "{mime_type}" });
 
-    /* -- Track selectors -- */
     var audioSel = document.getElementById("audioSelect");
     var subSel   = document.getElementById("subSelect");
 
-    /* Populate audio selector from Video.js native audioTracks (works in Chrome/Edge for MKV/MP4) */
-    function populateNativeTracks() {
+    /* ── Load track list from /api/tracks/ ── */
+    function loadTracks() {
+        fetch("/api/tracks/" + MSG_ID)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                tracksData.audio     = data.audio     || [];
+                tracksData.subtitles = data.subtitles || [];
+                buildAudioSelector();
+                buildSubSelector();
+            })
+            .catch(function() {
+                /* ffprobe not available — fall back to native browser tracks */
+                player.one("loadedmetadata", function() {
+                    setTimeout(buildNativeTracks, 400);
+                });
+            });
+    }
+
+    /* Build audio <select> from ffprobe data */
+    function buildAudioSelector() {
+        var tracks = tracksData.audio;
+        if (tracks.length < 1) return;
+        audioSel.innerHTML = "";
+        tracks.forEach(function(t, i) {
+            var opt = document.createElement("option");
+            opt.value = i;                          /* position index, not stream index */
+            opt.dataset.streamIndex = t.index;      /* actual ffmpeg stream index */
+            opt.textContent = t.label || t.language || ("Audio " + (i + 1));
+            if (t.language) opt.textContent += " (" + t.language + ")";
+            if (i === 0) { opt.selected = true; }
+            audioSel.appendChild(opt);
+        });
+        audioSel.disabled = tracks.length < 2;
+        if (tracks.length > 1) {
+            document.querySelector(".track-select-wrap:first-child .track-label").textContent =
+                "Audio (" + tracks.length + " tracks)";
+        }
+    }
+
+    /* Build subtitle <select> from ffprobe data */
+    function buildSubSelector() {
+        var tracks = tracksData.subtitles;
+        subSel.innerHTML = "<option value='off'>Off</option>";
+        if (tracks.length === 0) {
+            var none = document.createElement("option");
+            none.disabled = true; none.textContent = "None in file";
+            subSel.appendChild(none);
+            return;
+        }
+        tracks.forEach(function(t, i) {
+            var opt = document.createElement("option");
+            opt.value = i;
+            opt.dataset.streamIndex = t.index;
+            opt.textContent = t.label || t.language || ("Sub " + (i + 1));
+            if (t.language) opt.textContent += " (" + t.language + ")";
+            subSel.appendChild(opt);
+        });
+        document.querySelector(".track-select-wrap:last-child .track-label").textContent =
+            "Subtitles (" + tracks.length + " found)";
+    }
+
+    /* Fallback: use Video.js native audioTracks when ffprobe is unavailable */
+    function buildNativeTracks() {
         var vjsAudio = player.audioTracks();
         if (vjsAudio && vjsAudio.length > 1) {
             audioSel.innerHTML = "";
@@ -2461,92 +2525,72 @@ watch_tmplt = """<!DOCTYPE html>
             document.querySelector(".track-select-wrap:first-child .track-label").textContent =
                 "Audio (" + vjsAudio.length + " tracks)";
         }
-
-        var vjsSubs = player.textTracks();
-        if (vjsSubs && vjsSubs.length > 0) {
-            subSel.innerHTML = "<option value='off'>Off</option>";
-            var count = 0;
-            for (var j = 0; j < vjsSubs.length; j++) {
-                var st = vjsSubs[j];
-                if (st.kind === "metadata" || st.kind === "chapters") continue;
-                var sopt = document.createElement("option");
-                sopt.value = j;
-                sopt.textContent = st.label || st.language || ("Sub " + (count + 1));
-                subSel.appendChild(sopt);
-                count++;
-            }
-            if (count > 0) {
-                document.querySelector(".track-select-wrap:last-child .track-label").textContent =
-                    "Subtitles (" + count + " found)";
-            }
-        }
     }
 
-    /* Try native tracks once metadata is loaded, then again after canplay */
-    player.one("loadedmetadata", function() { setTimeout(populateNativeTracks, 300); });
-    player.one("canplay",        function() { setTimeout(populateNativeTracks, 300); });
-
-    /* Also try ffprobe endpoint as a fallback for servers that have ffprobe */
-    fetch("/api/tracks/" + MSG_ID)
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            var audioTracks = data.audio || [];
-            var subTracks   = data.subtitles || [];
-
-            if (audioTracks.length > 1) {
-                audioSel.innerHTML = "";
-                audioTracks.forEach(function(t, i) {
-                    var opt = document.createElement("option");
-                    opt.value = t.index;
-                    opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
-                    if (i === 0) opt.selected = true;
-                    audioSel.appendChild(opt);
-                });
-                audioSel.disabled = false;
-                document.querySelector(".track-select-wrap:first-child .track-label").textContent =
-                    "Audio (" + audioTracks.length + " tracks)";
-            }
-
-            if (subTracks.length > 0) {
-                subSel.innerHTML = "<option value='off'>Off</option>";
-                subTracks.forEach(function(t) {
-                    var opt = document.createElement("option");
-                    opt.value = t.index;
-                    opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
-                    subSel.appendChild(opt);
-                });
-                document.querySelector(".track-select-wrap:last-child .track-label").textContent =
-                    "Subtitles (" + subTracks.length + " found)";
-            }
-        })
-        .catch(function() { /* ffprobe not available, native tracks already handled */ });
-
-    /* Audio switching */
+    /* ── Audio track switching ──
+       Strategy: reload the source with ?audio=N so the server (if ffmpeg is
+       available) re-muxes only the selected track. Restore playback position. */
     audioSel.addEventListener("change", function() {
-        var vjsAudio = player.audioTracks();
-        var targetVal = parseInt(this.value);
-        for (var i = 0; i < vjsAudio.length; i++) {
-            vjsAudio[i].enabled = (i === targetVal);
-        }
-    });
+        var selectedIdx = parseInt(this.value);
+        if (selectedIdx === currentAudioIdx) return;
+        currentAudioIdx = selectedIdx;
 
-    /* Subtitle switching */
-    subSel.addEventListener("change", function() {
-        var val = this.value;
-        if (val === "off") {
-            var vjsSubs = player.textTracks();
-            for (var i = 0; i < vjsSubs.length; i++) {
-                vjsSubs[i].mode = "hidden";
+        /* Try Video.js native audioTracks first (works for MP4 in Chrome/Edge) */
+        var vjsAudio = player.audioTracks();
+        if (vjsAudio && vjsAudio.length > 1) {
+            for (var i = 0; i < vjsAudio.length; i++) {
+                vjsAudio[i].enabled = (i === selectedIdx);
             }
+            /* Native switch succeeded — no reload needed */
             return;
         }
+
+        /* Native API unavailable (MKV in most browsers) — reload source with
+           ?audio=N parameter so server can filter the track, resuming at current time. */
+        var currentTime = player.currentTime() || 0;
+        var wasPlaying  = !player.paused();
+        var newSrc = SRC + "?audio=" + selectedIdx;
+
+        player.src({ src: newSrc, type: "{mime_type}" });
+        player.load();
+        player.one("loadedmetadata", function() {
+            player.currentTime(currentTime);
+            if (wasPlaying) player.play();
+        });
+    });
+
+    /* ── Subtitle switching ── */
+    subSel.addEventListener("change", function() {
+        var val = this.value;
+        /* Try native Video.js text tracks */
         var vjsSubs = player.textTracks();
-        var targetIdx = parseInt(val);
+        var found = false;
         for (var i = 0; i < vjsSubs.length; i++) {
             if (vjsSubs[i].kind === "metadata" || vjsSubs[i].kind === "chapters") continue;
-            vjsSubs[i].mode = (i === targetIdx) ? "showing" : "hidden";
+            if (val !== "off" && parseInt(val) === i) {
+                vjsSubs[i].mode = "showing";
+                found = true;
+            } else {
+                vjsSubs[i].mode = "hidden";
+            }
+        }
+        /* If no native sub tracks, reload with ?sub=N */
+        if (!found && val !== "off") {
+            var ct  = player.currentTime() || 0;
+            var wp  = !player.paused();
+            var ai  = currentAudioIdx;
+            var newSrc = SRC + "?audio=" + ai + "&sub=" + val;
+            player.src({ src: newSrc, type: "{mime_type}" });
+            player.load();
+            player.one("loadedmetadata", function() {
+                player.currentTime(ct);
+                if (wp) player.play();
+            });
         }
     });
+
+    /* Start loading tracks */
+    loadTracks();
 
     player.on("error", function() {
         console.warn("Video.js error:", player.error());
