@@ -580,6 +580,42 @@ webapp_template = """
         .modal-empty-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
         .modal-empty-sub { font-size: 13px; color: var(--text3); line-height: 1.5; }
 
+        /* ── FILE SEARCH BAR ── */
+        .file-search-wrap {
+            padding: 10px 14px 6px;
+            flex-shrink: 0;
+        }
+        .file-search-input {
+            width: 100%; padding: 9px 14px 9px 36px;
+            border-radius: var(--radius-sm); border: 1px solid var(--border);
+            background: var(--card2); color: #fff;
+            font-family: 'Outfit', sans-serif; font-size: 13px;
+            outline: none; transition: border-color 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23666680' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 12px center;
+        }
+        .file-search-input::placeholder { color: var(--text3); }
+        .file-search-input:focus { border-color: rgba(229,9,20,0.4); }
+        .file-filter-row {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            padding: 4px 14px 8px;
+        }
+        .file-filter-chip {
+            border: 1px solid var(--border); background: rgba(255,255,255,.04);
+            color: var(--text2); font-size: 11px; font-weight: 600;
+            padding: 3px 10px; border-radius: 20px; cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            transition: background .15s, border-color .15s, color .15s;
+        }
+        .file-filter-chip.active {
+            background: var(--accent); color: #fff; border-color: var(--accent);
+        }
+        .file-filter-chip:hover:not(.active) { background: rgba(255,255,255,.08); color: #fff; }
+        .file-search-count {
+            font-size: 11px; color: var(--text3); padding: 0 14px 6px;
+        }
+
         /* ── REPAIR OVERLAY ── */
         .repair-overlay {
             position: fixed; inset: 0; z-index: 500;
@@ -1053,6 +1089,11 @@ webapp_template = """
         <div class="detail-section" id="detailQuotes"></div>
         <div class="modal-divider"></div>
         <div class="modal-files-label">Available Files</div>
+        <div class="file-search-wrap">
+            <input class="file-search-input" id="fileSearchInput" type="text" placeholder="Search episode, language, resolution..." autocomplete="off">
+        </div>
+        <div class="file-filter-row" id="fileFilterRow"></div>
+        <div class="file-search-count" id="fileSearchCount"></div>
         <div class="modal-files" id="modalFiles"></div>
         </div>
         <div class="file-action-bar" id="fileActionBar">
@@ -1826,18 +1867,30 @@ function renderSeasonFiles(filesEl, files) {
     const panel = document.createElement('div');
     panel.className = 'episode-panel';
 
-    function drawSeason(key) {
+    function drawSeason(key, query='') {
         active = key;
         strip.querySelectorAll('.season-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.season === String(key));
         });
-        const seasonFiles = [...seasons.get(key)].sort((a, b) => {
+        let seasonFiles = [...seasons.get(key)].sort((a, b) => {
             const epA = Number.isInteger(a.episode) ? a.episode : 9999;
             const epB = Number.isInteger(b.episode) ? b.episode : 9999;
             return epA - epB || a.name.localeCompare(b.name);
         });
-        panel.innerHTML = `<div class="episode-kicker">${seasonFiles.length} file${seasonFiles.length === 1 ? '' : 's'} in ${seasonLabel(key)}</div>`;
+        // Filter by search query
+        if (query) {
+            const q = query.toLowerCase();
+            seasonFiles = seasonFiles.filter(f =>
+                f.name.toLowerCase().includes(q) ||
+                (f.episode !== null && f.episode !== undefined && String(f.episode).includes(q))
+            );
+        }
+        panel.innerHTML = `<div class="episode-kicker">${seasonFiles.length} file${seasonFiles.length === 1 ? '' : 's'}${query ? ' matching' : ''} in ${seasonLabel(key)}</div>`;
+        if (seasonFiles.length === 0) {
+            panel.innerHTML += `<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">No episodes match your search.</div>`;
+        }
         seasonFiles.forEach(file => panel.appendChild(renderFileRow(file, true)));
+        document.getElementById('fileSearchCount').textContent = query ? `${seasonFiles.length} result${seasonFiles.length === 1 ? '' : 's'}` : '';
     }
 
     keys.forEach(key => {
@@ -1845,7 +1898,10 @@ function renderSeasonFiles(filesEl, files) {
         btn.className = 'season-btn';
         btn.dataset.season = String(key);
         btn.textContent = `${seasonLabel(key)} (${seasons.get(key).length})`;
-        btn.onclick = () => drawSeason(key);
+        btn.onclick = () => {
+            const q = (document.getElementById('fileSearchInput').value || '').trim();
+            drawSeason(key, q);
+        };
         strip.appendChild(btn);
     });
 
@@ -1853,11 +1909,100 @@ function renderSeasonFiles(filesEl, files) {
     filesEl.appendChild(strip);
     filesEl.appendChild(panel);
     drawSeason(active);
+
+    // Wire up search for TV — filters episodes in current season
+    const input = document.getElementById('fileSearchInput');
+    input.oninput = () => {
+        const q = input.value.trim();
+        drawSeason(active, q);
+    };
+    // Clear filter chips for TV mode
+    document.getElementById('fileFilterRow').innerHTML = '';
+}
+
+function extractFileMeta(files) {
+    // Extract unique resolutions and languages from filenames
+    const resRe = /\b(240p|360p|480p|576p|720p|1080p|1440p|2160p|4k|8k)\b/i;
+    const langRe = /\b(hindi|english|tamil|telugu|malayalam|kannada|punjabi|bengali|marathi|urdu|korean|japanese|chinese|spanish|french|portuguese|italian|turkish|arabic|russian|german|dual[ ._-]?audio|multi[ ._-]?audio)\b/i;
+    const resolutions = new Set();
+    const languages  = new Set();
+    files.forEach(f => {
+        const rm = f.name.match(resRe);
+        if (rm) resolutions.add(rm[1].toUpperCase());
+        const lm = f.name.match(new RegExp(langRe.source, 'gi'));
+        if (lm) lm.forEach(l => languages.add(l.charAt(0).toUpperCase() + l.slice(1).toLowerCase()));
+    });
+    return {
+        resolutions: Array.from(resolutions).sort(),
+        languages: Array.from(languages).sort()
+    };
+}
+
+function renderMovieFiles(filesEl, files) {
+    const meta = extractFileMeta(files);
+    let activeFilters = new Set();
+    let searchQuery = '';
+
+    const filterRow = document.getElementById('fileFilterRow');
+    const countEl   = document.getElementById('fileSearchCount');
+
+    function buildChips() {
+        filterRow.innerHTML = '';
+        [...meta.resolutions, ...meta.languages].forEach(tag => {
+            const chip = document.createElement('button');
+            chip.className = 'file-filter-chip' + (activeFilters.has(tag) ? ' active' : '');
+            chip.textContent = tag;
+            chip.onclick = () => {
+                if (activeFilters.has(tag)) activeFilters.delete(tag);
+                else activeFilters.add(tag);
+                buildChips();
+                drawFiles();
+            };
+            filterRow.appendChild(chip);
+        });
+    }
+
+    function drawFiles() {
+        let filtered = files.filter(f => {
+            const name = f.name.toLowerCase();
+            // Text search
+            if (searchQuery && !name.includes(searchQuery.toLowerCase())) return false;
+            // Chip filters — all active chips must match
+            for (const tag of activeFilters) {
+                if (!name.toLowerCase().includes(tag.toLowerCase())) return false;
+            }
+            return true;
+        });
+        filesEl.innerHTML = '';
+        countEl.textContent = (searchQuery || activeFilters.size) ? `${filtered.length} of ${files.length} files` : '';
+        if (filtered.length === 0) {
+            filesEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No files match your filter.</div>`;
+        } else {
+            filtered.forEach(file => filesEl.appendChild(renderFileRow(file)));
+        }
+    }
+
+    buildChips();
+    drawFiles();
+
+    // Wire search input for movies
+    const input = document.getElementById('fileSearchInput');
+    input.oninput = () => {
+        searchQuery = input.value.trim();
+        drawFiles();
+    };
 }
 
 async function loadFilesForItem(item) {
     const filesEl = document.getElementById('modalFiles');
     filesEl.innerHTML = `<div class="modal-loading"><div class="spinner"></div>Searching files...</div>`;
+    // Reset search UI
+    const searchInput = document.getElementById('fileSearchInput');
+    const filterRow   = document.getElementById('fileFilterRow');
+    const countEl     = document.getElementById('fileSearchCount');
+    if (searchInput) { searchInput.value = ''; searchInput.oninput = null; }
+    if (filterRow)   filterRow.innerHTML = '';
+    if (countEl)     countEl.textContent = '';
     try {
         const files = await fetchFilesForItem(item);
         if (!files.length) {
@@ -1869,11 +2014,11 @@ async function loadFilesForItem(item) {
                 </div>`;
             return;
         }
-        if (item.type === 'tv') {
+        if (item.type === 'tv' || item.type === 'anime') {
             renderSeasonFiles(filesEl, files);
         } else {
             filesEl.innerHTML = '';
-            files.forEach(file => filesEl.appendChild(renderFileRow(file)));
+            renderMovieFiles(filesEl, files);
         }
     } catch(e) {
         filesEl.innerHTML = `<div class="modal-empty"><div class="modal-empty-icon">⚠️</div><div class="modal-empty-title">Error</div><div class="modal-empty-sub">Failed to load files.</div></div>`;
