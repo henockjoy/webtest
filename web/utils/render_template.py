@@ -2512,6 +2512,23 @@ watch_tmplt = """<!DOCTYPE html>
         showErr();
     });
 
+    /* ── Auto-rotate to landscape on fullscreen (mobile) ── */
+    player.on("fullscreenchange", function() {
+        if (player.isFullscreen()) {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock("landscape").catch(function() {});
+                }
+            } catch(e) {}
+        } else {
+            try {
+                if (screen.orientation && screen.orientation.unlock) {
+                    screen.orientation.unlock();
+                }
+            } catch(e) {}
+        }
+    });
+
     setTimeout(function() {
         if (player.paused() && player.currentTime() === 0 && !player.seeking()) {
             showErr();
