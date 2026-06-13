@@ -391,77 +391,13 @@ async def build_mal_details(session, mal_id):
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
-    import logging, traceback as _tb
-    logger = logging.getLogger(__name__)
     message_id_str = request.match_info.get('message_id', '')
     try:
         message_id = int(message_id_str)
     except (ValueError, TypeError):
         return web.Response(text=error_tmplt, content_type='text/html')
-
-    # ── Step 1: fetch message ──────────────────────────────────────────────
-    try:
-        media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
-    except Exception as e:
-        logger.error(f"[watch] get_messages failed id={message_id}: {e}\n{_tb.format_exc()}")
-        return web.Response(text=error_tmplt, content_type='text/html')
-
-    if not media_msg or not media_msg.media:
-        logger.warning(f"[watch] id={message_id} empty message or no media")
-        return web.Response(text=error_tmplt, content_type='text/html')
-
-    # ── Step 2: extract media object ──────────────────────────────────────
-    try:
-        media = getattr(media_msg, media_msg.media.value, None)
-    except Exception as e:
-        logger.error(f"[watch] getattr media failed id={message_id}: {e}")
-        return web.Response(text=error_tmplt, content_type='text/html')
-
-    if not media:
-        logger.warning(f"[watch] id={message_id} media object is None")
-        return web.Response(text=error_tmplt, content_type='text/html')
-
-    # ── Step 3: video check ───────────────────────────────────────────────
-    mime      = (getattr(media, 'mime_type', '') or '').strip()
-    file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
-    tag       = mime.split('/')[0].lower()
-    ext       = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
-    VIDEO_EXTS = {'mp4','mkv','avi','mov','wmv','flv','webm','m4v','ts','mpeg','mpg','3gp','ogv'}
-    is_video  = tag == 'video' or mime == 'application/octet-stream' or ext in VIDEO_EXTS
-
-    if not is_video:
-        logger.warning(f"[watch] id={message_id} not video: mime='{mime}' ext='{ext}'")
-        return web.Response(text=error_tmplt, content_type='text/html')
-
-    # ── Step 4: build the watch page HTML ────────────────────────────────
-    try:
-        src           = urllib.parse.urljoin(URL, f'download/{message_id}')
-        file_name_safe = html.escape(file_name)
-        heading        = html.escape(f'Watch \u2014 {file_name}')
-        # Resolve the real MIME type (Telegram often sends octet-stream for MKV/AVI)
-        if mime and mime != 'application/octet-stream':
-            resolved_mime = mime
-        else:
-            mime_map = {
-                'mkv': 'video/x-matroska', 'avi': 'video/x-msvideo',
-                'mov': 'video/quicktime',  'wmv': 'video/x-ms-wmv',
-                'flv': 'video/x-flv',     'webm': 'video/webm',
-                'm4v': 'video/x-m4v',     'ts': 'video/mp2t',
-                'mpeg': 'video/mpeg',      'mpg': 'video/mpeg',
-                '3gp': 'video/3gpp',       'ogv': 'video/ogg',
-                'mp4': 'video/mp4',
-            }
-            resolved_mime = mimetypes.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
-        page_html = (watch_tmplt
-                     .replace('{heading}',    heading)
-                     .replace('{file_name}',  file_name_safe)
-                     .replace('{message_id}', str(message_id))
-                     .replace('{mime_type}',  resolved_mime)
-                     .replace('{src}',        src))
-        return web.Response(text=page_html, content_type='text/html')
-    except Exception as e:
-        logger.error(f"[watch] template render failed id={message_id}: {e}\n{_tb.format_exc()}")
-        return web.Response(text=error_tmplt, content_type='text/html')
+    page_html = await media_watch(message_id)
+    return web.Response(text=page_html, content_type='text/html')
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
@@ -480,7 +416,7 @@ async def download_handler(request):
 
 @routes.get("/api/stream-file/{file_id}")
 async def stream_file_handler(request):
-    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}"""
+    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}?fid={file_id}"""
     try:
         file_id = request.match_info['file_id']
         try:
@@ -497,7 +433,9 @@ async def stream_file_handler(request):
                     status=410
                 )
             raise
-        raise web.HTTPFound(location=f"/watch/{msg.id}")
+        # Pass original file_id as query param so watch/download can re-copy if message expires
+        encoded_fid = urllib.parse.quote(file_id, safe='')
+        raise web.HTTPFound(location=f"/watch/{msg.id}?fid={encoded_fid}")
     except web.HTTPFound:
         raise
     except Exception as e:
@@ -790,6 +728,7 @@ async def debug_watch_handler(request):
         result["steps"].append("get_messages: ok")
         result["msg_id_returned"] = getattr(media_msg, "id", None)
         result["msg_empty"] = media_msg is None
+        result["pyrogram_empty"] = getattr(media_msg, "empty", None)
         if not media_msg or not media_msg.media:
             result["steps"].append("FAIL: message missing or no media")
             result["media_value"] = None
@@ -831,6 +770,63 @@ async def debug_watch_handler(request):
     except Exception as e:
         result["steps"].append(f"EXCEPTION: {e}")
         result["traceback"] = traceback.format_exc()
+    return web.json_response(result)
+
+
+@routes.get("/api/debug-stream")
+async def debug_stream_handler(request):
+    """Tests the full send_cached_media → watch flow using the first file in the DB."""
+    import traceback as _tb
+    result = {"steps": [], "bin_channel": BIN_CHANNEL}
+    try:
+        from database.ia_filterdb import collection, second_collection, SECOND_FILES_DATABASE_URL
+        doc = await collection.find_one({})
+        if not doc and SECOND_FILES_DATABASE_URL and second_collection:
+            doc = await second_collection.find_one({})
+        if not doc:
+            result["steps"].append("FAIL: no files found in database")
+            return web.json_response(result)
+        file_id = doc["_id"]
+        result["db_file_id"] = file_id
+        result["db_file_name"] = doc.get("file_name", "unknown")
+        result["steps"].append(f"found file in db: {doc.get('file_name','?')}")
+
+        # Try send_cached_media
+        try:
+            msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
+            result["send_cached_media"] = "ok"
+            result["new_msg_id"] = msg.id
+            result["steps"].append(f"send_cached_media ok, msg_id={msg.id}")
+        except Exception as e:
+            result["send_cached_media"] = f"FAILED: {e}"
+            result["send_cached_media_traceback"] = _tb.format_exc()
+            result["steps"].append(f"send_cached_media FAILED: {e}")
+            return web.json_response(result)
+
+        # Try get_messages on the new message
+        try:
+            media_msg = await temp.BOT.get_messages(BIN_CHANNEL, msg.id)
+            result["get_messages"] = "ok"
+            result["msg_id_returned"] = getattr(media_msg, "id", None)
+            result["msg_has_media"] = media_msg.media is not None
+            result["media_type"] = str(media_msg.media) if media_msg.media else None
+            result["steps"].append(f"get_messages ok, has_media={media_msg.media is not None}")
+            if media_msg.media:
+                media = getattr(media_msg, media_msg.media.value, None)
+                result["media_obj"] = media is not None
+                if media:
+                    result["mime_type"] = getattr(media, "mime_type", None)
+                    result["file_name"] = getattr(media, "file_name", None)
+                    result["file_size"] = getattr(media, "file_size", None)
+        except Exception as e:
+            result["get_messages"] = f"FAILED: {e}"
+            result["steps"].append(f"get_messages FAILED: {e}")
+
+        result["watch_url"] = f"/watch/{msg.id}"
+        result["download_url"] = f"/download/{msg.id}"
+    except Exception as e:
+        result["steps"].append(f"EXCEPTION: {e}")
+        result["traceback"] = _tb.format_exc()
     return web.json_response(result)
 
 
