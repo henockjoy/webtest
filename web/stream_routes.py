@@ -397,13 +397,17 @@ async def watch_handler(request):
     try:
         message_id = int(message_id_str)
     except (ValueError, TypeError):
-        return web.Response(text=error_tmplt, content_type='text/html')
+        return web.Response(text=error_tmplt, content_type='text/html', charset='utf-8')
     try:
         page_html = await media_watch(message_id)
-        return web.Response(text=page_html, content_type='text/html')
+        return web.Response(
+            body=page_html.encode('utf-8'),
+            content_type='text/html',
+            charset='utf-8'
+        )
     except Exception as e:
         logger.error(f"[watch] media_watch threw for id={message_id}: {e}\n{_tb.format_exc()}")
-        return web.Response(text=error_tmplt, content_type='text/html')
+        return web.Response(text=error_tmplt, content_type='text/html', charset='utf-8')
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
