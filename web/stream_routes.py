@@ -391,13 +391,19 @@ async def build_mal_details(session, mal_id):
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
+    import logging, traceback as _tb
+    logger = logging.getLogger(__name__)
     message_id_str = request.match_info.get('message_id', '')
     try:
         message_id = int(message_id_str)
     except (ValueError, TypeError):
         return web.Response(text=error_tmplt, content_type='text/html')
-    page_html = await media_watch(message_id)
-    return web.Response(text=page_html, content_type='text/html')
+    try:
+        page_html = await media_watch(message_id)
+        return web.Response(text=page_html, content_type='text/html')
+    except Exception as e:
+        logger.error(f"[watch] media_watch threw for id={message_id}: {e}\n{_tb.format_exc()}")
+        return web.Response(text=error_tmplt, content_type='text/html')
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
@@ -828,6 +834,26 @@ async def debug_stream_handler(request):
         result["steps"].append(f"EXCEPTION: {e}")
         result["traceback"] = _tb.format_exc()
     return web.json_response(result)
+
+
+@routes.get("/api/debug-watch-trace/{message_id}")
+async def debug_watch_trace_handler(request):
+    """Returns the full exception traceback if media_watch throws."""
+    import traceback as _tb2
+    message_id = int(request.match_info['message_id'])
+    try:
+        html_out = await media_watch(message_id)
+        return web.json_response({
+            "ok": True,
+            "length": len(html_out),
+            "preview": html_out[:200]
+        })
+    except Exception as e:
+        return web.json_response({
+            "ok": False,
+            "error": str(e),
+            "traceback": _tb2.format_exc()
+        })
 
 
 @routes.get("/api/repair-status")
