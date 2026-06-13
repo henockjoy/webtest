@@ -404,6 +404,19 @@ async def download_handler(request):
         return web.Response(text=error_tmplt, content_type='text/html')
         
 
+
+@routes.get("/api/stream-file/{file_id}")
+async def stream_file_handler(request):
+    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}"""
+    try:
+        file_id = request.match_info['file_id']
+        msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
+        raise web.HTTPFound(location=f"/watch/{msg.id}")
+    except web.HTTPFound:
+        raise
+    except Exception as e:
+        return web.Response(text=error_tmplt, content_type='text/html')
+
 @routes.get("/", allow_head=True)
 async def webapp_route_handler(request):
     if not TMDB_API_KEY:
@@ -743,6 +756,19 @@ async def today_airing_handler(request):
             anime_sched = await fetch_json(
                 session, f"{JIKAN_BASE}/schedules",
                 params={"filter": day_name, "limit": 25}
+            )
+            # 3. TMDB: movies with digital/OTT release today (release_type 4=Digital, 6=Streaming)
+            ott_data = await fetch_json(
+                session, f"{TMDB_BASE}/discover/movie",
+                params={
+                    "api_key": TMDB_API_KEY,
+                    "region": "US",
+                    "with_release_type": "4|6",
+                    "release_date.gte": today,
+                    "release_date.lte": today,
+                    "sort_by": "popularity.desc",
+                    "page": "1"
+                }
             )
 
         tv_shows = []
