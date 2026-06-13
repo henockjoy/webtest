@@ -2246,6 +2246,7 @@ watch_tmplt = """<!DOCTYPE html>
 <script>
 (function() {
     var SRC = "{src}";
+    var MSG_ID = "{message_id}";
     var errShown = false;
 
     function showErr() {
@@ -2294,73 +2295,71 @@ watch_tmplt = """<!DOCTYPE html>
 
     player.src({ src: SRC, type: "video/mp4" });
 
-    player.ready(function() {
-        /* ── Populate audio track selector ── */
-        var audioTracks = player.audioTracks();
-        var audioSel = document.getElementById("audioSelect");
+    /* ── Fetch track info from server (ffprobe) ── */
+    var audioSel = document.getElementById("audioSelect");
+    var subSel   = document.getElementById("subSelect");
 
-        function refreshAudioTracks() {
-            audioSel.innerHTML = "";
-            var count = audioTracks.length;
-            for (var i = 0; i < count; i++) {
-                var t = audioTracks[i];
-                var opt = document.createElement("option");
-                opt.value = i;
-                opt.textContent = t.label || t.language || ("Track " + (i + 1));
-                if (t.enabled) opt.selected = true;
-                audioSel.appendChild(opt);
-            }
-            if (count > 1) {
-                audioSel.disabled = false;
-            } else {
-                audioSel.disabled = false;
-                if (count === 0) {
+    fetch("/api/tracks/" + MSG_ID)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            /* Audio tracks */
+            var audioTracks = data.audio || [];
+            if (audioTracks.length > 1) {
+                audioSel.innerHTML = "";
+                audioTracks.forEach(function(t, i) {
                     var opt = document.createElement("option");
-                    opt.value = ""; opt.textContent = "Default";
+                    opt.value = t.index;
+                    opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
+                    if (i === 0) opt.selected = true;
                     audioSel.appendChild(opt);
-                }
+                });
+                audioSel.disabled = false;
+                document.querySelector(".track-select-wrap:first-child .track-label").textContent = "\uD83C\uDFA7 Audio (" + audioTracks.length + " tracks)";
+            } else {
+                audioSel.innerHTML = "<option value=''>Default</option>";
+                audioSel.disabled = true;
             }
-        }
 
-        refreshAudioTracks();
-        audioTracks.addEventListener("change", refreshAudioTracks);
-
-        audioSel.addEventListener("change", function() {
-            var idx = parseInt(this.value);
-            for (var i = 0; i < audioTracks.length; i++) {
-                audioTracks[i].enabled = (i === idx);
-            }
-        });
-
-        /* ── Populate subtitle selector ── */
-        var textTracks = player.textTracks();
-        var subSel = document.getElementById("subSelect");
-
-        function refreshSubTracks() {
+            /* Subtitle tracks */
+            var subTracks = data.subtitles || [];
             subSel.innerHTML = "<option value='off'>Off</option>";
-            var added = 0;
-            for (var i = 0; i < textTracks.length; i++) {
-                var t = textTracks[i];
-                if (t.kind === "metadata" || t.kind === "chapters") continue;
+            if (subTracks.length > 0) {
+                subTracks.forEach(function(t) {
+                    var opt = document.createElement("option");
+                    opt.value = t.index;
+                    opt.textContent = t.label + (t.language && t.language !== t.label ? " (" + t.language + ")" : "");
+                    subSel.appendChild(opt);
+                });
+                document.querySelector(".track-select-wrap:last-child .track-label").textContent = "\uD83D\uDCFA Subtitles (" + subTracks.length + " found)";
+            } else {
                 var opt = document.createElement("option");
-                opt.value = i;
-                opt.textContent = t.label || t.language || ("Sub " + (added + 1));
-                if (t.mode === "showing") opt.selected = true;
+                opt.value = ""; opt.disabled = true;
+                opt.textContent = "None in file";
                 subSel.appendChild(opt);
-                added++;
             }
-        }
-
-        refreshSubTracks();
-        textTracks.addEventListener("change", refreshSubTracks);
-
-        subSel.addEventListener("change", function() {
-            var val = this.value;
-            for (var i = 0; i < textTracks.length; i++) {
-                if (textTracks[i].kind === "metadata") continue;
-                textTracks[i].mode = (String(i) === val) ? "showing" : "hidden";
-            }
+        })
+        .catch(function() {
+            audioSel.innerHTML = "<option value=''>Default</option>";
+            audioSel.disabled = true;
         });
+
+    /* Audio track switching via Video.js audioTracks API */
+    audioSel.addEventListener("change", function() {
+        var vjsAudio = player.audioTracks();
+        var targetIdx = parseInt(this.value);
+        for (var i = 0; i < vjsAudio.length; i++) {
+            vjsAudio[i].enabled = (vjsAudio[i].id == targetIdx || i === targetIdx);
+        }
+    });
+
+    /* Subtitle switching via Video.js textTracks API */
+    subSel.addEventListener("change", function() {
+        var val = this.value;
+        var vjsSubs = player.textTracks();
+        for (var i = 0; i < vjsSubs.length; i++) {
+            if (vjsSubs[i].kind === "metadata") continue;
+            vjsSubs[i].mode = (String(vjsSubs[i].id) === val || String(i) === val) ? "showing" : "hidden";
+        }
     });
 
     player.on("error", function() {
@@ -2835,7 +2834,8 @@ async def media_watch(message_id):
     # Replace template tokens — {heading} and {file_name} before {src}
     # to avoid any partial re-substitution if values ever contain braces.
     html_ = (watch_tmplt
-             .replace('{heading}',   heading)
-             .replace('{file_name}', file_name_safe)
-             .replace('{src}',       src))
+             .replace('{heading}',    heading)
+             .replace('{file_name}',  file_name_safe)
+             .replace('{message_id}', str(message_id))
+             .replace('{src}',        src))
     return html_
