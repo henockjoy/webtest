@@ -389,18 +389,26 @@ async def build_mal_details(session, mal_id):
 
 @routes.get("/watch/{message_id}")
 async def watch_handler(request):
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         message_id = int(request.match_info['message_id'])
         return web.Response(text=await media_watch(message_id), content_type='text/html')
     except Exception as e:
+        logger.error(f"[watch_handler] unhandled error for message_id={request.match_info.get('message_id')}: {e}")
         return web.Response(text=error_tmplt, content_type='text/html')
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         message_id = int(request.match_info['message_id'])
         return await media_download(request, message_id)
-    except:
+    except web.HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[download_handler] error for message_id={request.match_info.get('message_id')}: {e}")
         return web.Response(text=error_tmplt, content_type='text/html')
         
 
@@ -901,7 +909,15 @@ async def today_airing_handler(request):
 async def media_download(request, message_id: int):
     range_header = request.headers.get('Range', '')
     media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
+
+    # Guard: message must exist and carry media
+    if not media_msg or not media_msg.media:
+        raise web.HTTPNotFound(text=error_tmplt, content_type='text/html')
+
     media = getattr(media_msg, media_msg.media.value, None)
+    if not media:
+        raise web.HTTPNotFound(text=error_tmplt, content_type='text/html')
+
     file_size = media.file_size
 
     if range_header:
