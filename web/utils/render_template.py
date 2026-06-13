@@ -2987,14 +2987,21 @@ async def media_watch(message_id):
 
     src = urllib.parse.urljoin(URL, f'download/{message_id}')
 
-    # Only serve video files on the watch page
+    # Determine if this is a playable video file.
+    # Telegram sometimes reports mime as application/octet-stream or leaves it empty
+    # for MKV/AVI/etc, so we also check the file extension as a fallback.
     mime = getattr(media, 'mime_type', '') or ''
-    tag  = mime.split('/')[0].strip().lower()
-    if tag != 'video':
-        return error_tmplt
-
-    # Safe filename — Telegram may omit it for raw video blobs
     file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
+    tag = mime.split('/')[0].strip().lower()
+    ext = re.sub(r'^.*\.', '', file_name.lower()) if '.' in file_name else ''
+
+    VIDEO_MIMES = {'video', 'application/octet-stream'}
+    VIDEO_EXTS  = {'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', 'ts', 'mpeg', 'mpg', '3gp', 'ogv'}
+
+    is_video = (tag == 'video') or (mime in VIDEO_MIMES) or (ext in VIDEO_EXTS)
+    if not is_video:
+        logger.warning(f"[media_watch] message {message_id} rejected: mime='{mime}' ext='{ext}' — not a recognised video")
+        return error_tmplt
     file_name_safe = html.escape(file_name)
     heading   = html.escape(f'Watch \u2014 {file_name}')
 
