@@ -2235,392 +2235,767 @@ watch_tmplt = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{heading}</title>
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
     <style>
-        :root {
-            --accent:#0ea5e9; --bg:#0a0a0f; --border:rgba(255,255,255,.07);
-            --txt:#fff; --txt2:#94a3b8; --card:#16161f; --card2:#1e1e2a;
+        .plyr__progress, .plyr__volume { --plyr-color-main: #e50914; }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #0a0a0a; color: #e5e5e5;
+            font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh; display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+            animation: fadeIn 0.3s ease-out both;
         }
-        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:Inter,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
-        body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 50% at 10% 20%,rgba(14,165,233,.08) 0%,transparent 60%),linear-gradient(160deg,#0a0a0f 0%,#111118 100%)}
-        header{padding:.85rem 1.5rem;background:rgba(10,10,15,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;gap:.3rem}
-        .logo{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#fff 0%,var(--accent) 60%,#38bdf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        #file-name{font-size:.78rem;color:var(--txt2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92vw;text-align:center}
-        .container{flex:1;display:flex;flex-direction:column;align-items:center;padding:1.4rem 1rem 2.5rem;width:100%;max-width:1100px;margin:0 auto}
-        .live-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.35);padding:.28rem .9rem;border-radius:30px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
-        .live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
-        @keyframes pulse{50%{opacity:.3;box-shadow:none}}
 
-        /* ── Player ── */
-        .player-wrap{width:100%;position:relative;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);background:#000;aspect-ratio:16/9}
-        .video-js{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;border-radius:16px}
-        .vjs-theme-ft .vjs-control-bar{background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 100%);height:3.8em}
-        .vjs-theme-ft .vjs-play-progress,.vjs-theme-ft .vjs-volume-level{background:var(--accent)}
-        .vjs-theme-ft .vjs-load-progress{background:rgba(14,165,233,.25)}
-        .vjs-theme-ft .vjs-slider{background:rgba(255,255,255,.2)}
-        .vjs-theme-ft .vjs-big-play-button{background:rgba(14,165,233,.85)!important;border:none!important;border-radius:50%!important;width:64px!important;height:64px!important;line-height:64px!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;transition:background .2s,transform .2s!important}
-        .vjs-theme-ft:hover .vjs-big-play-button{background:var(--accent)!important;transform:translate(-50%,-50%) scale(1.08)!important}
-        /* Video.js menus */
-        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu .vjs-menu-content{background:rgba(12,12,20,.97);border:1px solid var(--border);border-radius:10px;max-height:220px;padding:4px 0}
-        .vjs-theme-ft .vjs-menu li{font-size:.8rem;padding:.48rem 1rem;color:var(--txt2)}
-        .vjs-theme-ft .vjs-menu li.vjs-selected{color:var(--accent);font-weight:700}
-        .vjs-theme-ft .vjs-menu li:hover{background:rgba(14,165,233,.15);color:#fff}
-        .vjs-theme-ft .vjs-menu-button-popup .vjs-menu{margin-bottom:2.2em}
-        /* Subtitle cues */
-        .vjs-text-track-display{font-family:Inter,sans-serif!important}
-        ::cue{background:rgba(0,0,0,.78);color:#fff;font-size:1.05em;font-family:Inter,sans-serif}
+        @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp  { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown{ from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn  { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+        @keyframes popIn    { 0% { opacity: 0; transform: scale(0.85); } 70% { transform: scale(1.03); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes shimmer  { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+        @keyframes glowPulse{ 0%,100% { box-shadow: 0 0 0 0 rgba(229,9,20,0); } 50% { box-shadow: 0 0 8px 2px rgba(229,9,20,0.25); } }
+        @keyframes tabSlideIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
-        /* ── Error overlay ── */
-        #vidErr{display:none;position:absolute;inset:0;z-index:99;background:rgba(10,10,15,.94);border-radius:16px;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}
-        #vidErr.show{display:flex}
-        #vidErr svg{color:rgba(255,255,255,.4);margin-bottom:1rem}
-        #vidErr h2{font-size:1.3rem;font-weight:800;margin-bottom:.5rem}
-        #vidErr p{font-size:.85rem;color:var(--txt2);line-height:1.55}
+        .header {
+            background: #141414; padding: 14px 20px;
+            display: flex; align-items: center; gap: 12px;
+            animation: slideDown 0.25s ease-out both;
+        }
+        .header-icon {
+            width: 32px; height: 32px; background: #e50914; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .header-icon:hover { transform: scale(1.1) rotate(-3deg); }
+        .header-icon svg { width: 18px; height: 18px; fill: white; transition: transform 0.2s ease; }
+        .header-icon:hover svg { transform: scale(1.15); }
+        .file-name {
+            font-size: clamp(0.85rem, 2.5vw, 1rem); font-weight: 500; color: #ffffff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+        }
+        .telegram-logo-link {
+            width: 38px; height: 38px; background: #24a1de; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), background-color 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none; box-shadow: 0 2px 10px rgba(36,161,222,0.3);
+            animation: popIn 0.3s ease-out both; animation-delay: 0.1s;
+        }
+        .telegram-logo-link:hover { transform: scale(1.12) rotate(-5deg); background-color: #2cb3f2; box-shadow: 0 4px 15px rgba(36,161,222,0.55); }
+        .telegram-logo-link svg { width: 22px; height: 22px; fill: white; transition: transform 0.2s ease; }
+        .telegram-logo-link:hover svg { transform: scale(1.08); }
 
-        /* ── Controls panel below player ── */
-        .controls-panel{width:100%;margin-top:.9rem;display:flex;flex-direction:column;gap:.7rem}
+        .player-wrapper { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: clamp(8px,1.5vw,16px) clamp(12px,3vw,32px); }
+        .player-resizable-wrapper {
+            position: relative; padding: 8px; box-sizing: border-box;
+            width: 70vw; max-width: 1400px; margin: 0 auto;
+            animation: scaleIn 0.35s cubic-bezier(0.22,1,0.36,1) both; animation-delay: 0.08s;
+        }
+        .player-container {
+            width: 100%; height: 100%; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+            display: flex; flex-direction: column;
+        }
+        .player-container .plyr { height: 100% !important; width: 100% !important; flex: 1; }
+        .player-container video {
+            max-width: 100% !important; max-height: 100% !important;
+            width: var(--video-width, 100%) !important; height: var(--video-height, 100%) !important;
+            object-fit: var(--video-object-fit, contain) !important;
+            aspect-ratio: var(--video-aspect-ratio, auto) !important; margin: auto;
+        }
 
-        /* Seek row */
-        .seek-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-        .seek-btn{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:.72rem;border-radius:10px;border:none;font-family:Inter,sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;color:#fff;background:var(--card2);border:1px solid var(--border);transition:background .18s,transform .15s}
-        .seek-btn:hover{background:rgba(255,255,255,.08)}
-        .seek-btn:active{transform:scale(.96)}
+        .resize-handle { position: absolute; z-index: 100; user-select: none; transition: background 0.2s ease, box-shadow 0.2s ease; touch-action: none; }
+        .resize-handle.handle-n { top:0;left:8px;right:8px;height:8px;cursor:ns-resize; }
+        .resize-handle.handle-s { bottom:0;left:8px;right:8px;height:8px;cursor:ns-resize; }
+        .resize-handle.handle-w { left:0;top:8px;bottom:8px;width:8px;cursor:ew-resize; }
+        .resize-handle.handle-e { right:0;top:8px;bottom:8px;width:8px;cursor:ew-resize; }
+        .resize-handle.handle-nw { top:0;left:0;width:10px;height:10px;cursor:nwse-resize; }
+        .resize-handle.handle-ne { top:0;right:0;width:10px;height:10px;cursor:nesw-resize; }
+        .resize-handle.handle-sw { bottom:0;left:0;width:10px;height:10px;cursor:nesw-resize; }
+        .resize-handle.handle-se { bottom:0;right:0;width:10px;height:10px;cursor:nwse-resize; }
+        .resize-handle:hover, .player-resizable-wrapper.resizing .active-handle { background: rgba(229,9,20,0.4); box-shadow: 0 0 8px rgba(229,9,20,0.6); }
 
-        /* Track selectors row */
-        .track-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-        .track-select-wrap{display:flex;flex-direction:column;gap:.3rem}
-        .track-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);padding-left:.2rem}
-        .track-select{width:100%;padding:.62rem .8rem;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:#fff;font-family:Inter,sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .7rem center;padding-right:2rem;transition:border-color .18s}
-        .track-select:focus{outline:none;border-color:rgba(14,165,233,.5)}
-        .track-select:disabled{opacity:.4;cursor:not-allowed}
-        .track-select option{background:#1e1e2a;color:#fff}
+        .below-player { width: 70vw; max-width: 1400px; margin: 0 auto; padding: 0 clamp(12px,3vw,32px) clamp(16px,3vw,32px); }
 
-        /* Download button */
-        .btn-dl{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;padding:.82rem 1.2rem;border-radius:10px;border:none;font-family:Inter,sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;text-decoration:none;color:#fff;background:linear-gradient(135deg,#4f46e5,#818cf8);box-shadow:0 4px 14px rgba(99,102,241,.35);transition:transform .18s,filter .18s}
-        .btn-dl:hover{transform:scale(1.02);filter:brightness(1.1)}
-        .btn-dl:active{transform:scale(.97)}
+        .action-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; animation: slideUp 0.3s ease-out both; animation-delay: 0.2s; }
+        .action-btn {
+            flex: 1; min-width: 120px; display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; padding: 11px 16px; background: #141414; border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; color: #ccc; font-family: inherit; font-size: 0.82rem; font-weight: 500;
+            cursor: pointer; position: relative; overflow: hidden;
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none;
+        }
+        .action-btn::after { content:''; position:absolute; inset:0; background: radial-gradient(circle at var(--ripple-x,50%) var(--ripple-y,50%), rgba(255,255,255,0.15) 0%, transparent 60%); opacity:0; transition: opacity 0.3s ease; pointer-events: none; }
+        .action-btn:active::after { opacity: 1; }
+        .action-btn:hover { transform: translateY(-2px); background: #1a1a1a; border-color: rgba(229,9,20,0.3); color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .action-btn:active { transform: scale(0.96); }
+        .action-btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; transition: transform 0.2s ease; }
+        .action-btn:hover svg { transform: scale(1.1); }
+        .action-btn.primary {
+            background: linear-gradient(135deg, #e50914 0%, #b20710 100%);
+            border-color: transparent; color: #fff; box-shadow: 0 2px 16px rgba(229,9,20,0.35);
+        }
+        .action-btn.primary::before { content:''; position:absolute; inset:0; background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.15) 50%,transparent 100%); background-size:200% 100%; animation: shimmer 2.5s ease-in-out infinite; pointer-events:none; }
+        .action-btn.primary:hover { box-shadow: 0 6px 24px rgba(229,9,20,0.5); }
+        .action-btn.copied { background: #1a3a1a; border-color: rgba(34,197,94,0.4); color: #22c55e; }
 
-        footer{padding:.8rem 1.5rem;text-align:center;color:var(--txt2);font-size:.72rem;margin-top:auto}
-        .ha-link{color:var(--accent);text-decoration:none;font-weight:600}
+        .openin-card { background: #141414; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; animation: slideUp 0.3s ease-out both; animation-delay: 0.3s; }
+        .openin-header { padding: 14px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .openin-header svg { width: 18px; height: 18px; fill: #e50914; }
+        .openin-title { font-size: 0.9rem; color: #ccc; font-weight: 500; }
+        .openin-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .openin-tab { flex:1; padding:10px 16px; background:none; border:none; color:#666; font-family:inherit; font-size:0.8rem; font-weight:500; cursor:pointer; position:relative; transition: color 0.2s ease, background 0.2s ease; }
+        .openin-tab:hover { color: #aaa; background: rgba(255,255,255,0.03); }
+        .openin-tab.active { color: #e50914; }
+        .openin-tab.active::after { content:''; position:absolute; bottom:0; left:16px; right:16px; height:2px; background:#e50914; border-radius:2px 2px 0 0; animation: glowPulse 2s ease-in-out infinite; }
+        .openin-content { display: none; padding: 14px; }
+        .openin-content.active { display: block; animation: tabSlideIn 0.2s ease-out both; }
+        .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+        .player-btn {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px; color: #bbb; font-family: inherit; font-size: 0.78rem;
+            font-weight: 500; cursor: pointer; text-decoration: none;
+            transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            animation: popIn 0.3s ease-out both;
+        }
+        .player-btn:hover { transform: translateY(-3px) scale(1.02); background: rgba(229,9,20,0.1); border-color: rgba(229,9,20,0.35); color: #fff; box-shadow: 0 6px 20px rgba(229,9,20,0.15); }
+        .player-btn:active { transform: scale(0.96); }
+        .player-btn .p-icon { width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem;font-weight:700;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+        .player-btn:hover .p-icon { transform: scale(1.15) rotate(-3deg); }
+        .player-btn .p-icon.vlc { background:#ff6600;color:#fff; }
+        .player-btn .p-icon.pot { background:#4a90d9;color:#fff; }
+        .player-btn .p-icon.mpv { background:#555;color:#fff; }
+        .player-btn .p-icon.kmp { background:#8b5cf6;color:#fff; }
+        .player-btn .p-icon.mpc { background:#3b82f6;color:#fff; }
+        .player-btn .p-icon.mx  { background:#00bcd4;color:#fff; }
+        .player-btn .p-icon.np  { background:#4caf50;color:#fff; }
+        .player-btn .p-icon.infuse { background:#f59e0b;color:#fff; }
+        .player-btn .p-icon.iina { background:#1a1a2e;color:#e50914; }
+        .player-btn .p-icon.sp  { background:#ff4081;color:#fff; }
+        .player-btn .p-icon.nxt { background:#009688;color:#fff; }
+        .player-btn .p-icon.nova{ background:#673ab7;color:#fff; }
+        .player-btn .p-icon.jp  { background:#607d8b;color:#fff; }
 
-        @media(max-width:600px){
-            .container{padding:1rem .75rem 2rem}
-            .track-row,.seek-row{grid-template-columns:1fr 1fr}
+        footer {
+            background: #141414; border-top: 1px solid rgba(255,255,255,0.06);
+            padding: 12px 20px; text-align: center; font-size: 0.75rem; color: #555;
+            letter-spacing: 0.3px; animation: slideUp 0.25s ease-out both; animation-delay: 0.4s; margin-top: auto;
+        }
+        footer a { color: #e50914; text-decoration: none; transition: color 0.2s ease, text-shadow 0.2s ease; }
+        footer a:hover { color: #ff3d47; text-shadow: 0 0 8px rgba(229,9,20,0.4); }
+
+        /* ── Custom Audio Track Selector ── */
+        .plyr__audio-selector { position: relative; display: inline-block; }
+        .plyr__audio-btn { background:transparent;border:0;border-radius:4px;color:#dbdbdb;cursor:pointer;padding:7px;transition:background 0.3s ease,color 0.3s ease;display:flex;align-items:center;justify-content:center;width:32px;height:32px; }
+        .plyr__audio-btn:hover { background:rgba(255,255,255,0.1);color:#fff; }
+        .plyr__audio-btn svg { width:18px;height:18px;fill:currentColor; }
+        .plyr__audio-dropdown { position:absolute;bottom:45px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,20,20,0.95);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.08);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);width:260px;max-height:250px;overflow-y:auto;z-index:10;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease; }
+        .plyr__audio-dropdown.show { opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0); }
+        .plyr__audio-option { display:block;width:100%;padding:10px 14px;background:transparent;border:0;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer;transition:background 0.2s ease,color 0.2s ease;border-bottom:1px solid rgba(255,255,255,0.03);white-space:normal;word-break:break-word; }
+        .plyr__audio-option:last-child { border-bottom:0; }
+        .plyr__audio-option:hover { background:rgba(255,255,255,0.05);color:#fff; }
+        .plyr__audio-option.active { background:rgba(229,9,20,0.15);color:#e50914;font-weight:500; }
+
+        /* ── Custom Subtitle Selector ── */
+        .plyr__sub-selector { position: relative; display: inline-block; }
+        .plyr__sub-btn { background:transparent;border:0;border-radius:4px;color:#dbdbdb;cursor:pointer;padding:7px;transition:background 0.3s ease,color 0.3s ease;display:flex;align-items:center;justify-content:center;width:32px;height:32px; }
+        .plyr__sub-btn:hover { background:rgba(255,255,255,0.1);color:#fff; }
+        .plyr__sub-btn svg { width:18px;height:18px;fill:currentColor; }
+        .plyr__sub-dropdown { position:absolute;bottom:45px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,20,20,0.95);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.08);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);width:260px;max-height:250px;overflow-y:auto;z-index:10;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease; }
+        .plyr__sub-dropdown.show { opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0); }
+        .plyr__sub-option { display:block;width:100%;padding:10px 14px;background:transparent;border:0;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer;transition:background 0.2s ease,color 0.2s ease;border-bottom:1px solid rgba(255,255,255,0.03);white-space:normal;word-break:break-word; }
+        .plyr__sub-option:last-child { border-bottom:0; }
+        .plyr__sub-option:hover { background:rgba(255,255,255,0.05);color:#fff; }
+        .plyr__sub-option.active { background:rgba(229,9,20,0.15);color:#e50914;font-weight:500; }
+
+        /* ── Custom Aspect Ratio Selector ── */
+        .plyr__aspect-selector { position: relative; display: inline-block; }
+        .plyr__aspect-btn { background:transparent;border:0;border-radius:4px;color:#dbdbdb;cursor:pointer;padding:7px;transition:background 0.3s ease,color 0.3s ease;display:flex;align-items:center;justify-content:center;width:32px;height:32px; }
+        .plyr__aspect-btn:hover { background:rgba(255,255,255,0.1);color:#fff; }
+        .plyr__aspect-btn svg { width:18px;height:18px;fill:currentColor; }
+        .plyr__aspect-dropdown { position:absolute;bottom:45px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(20,20,20,0.95);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.08);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);width:180px;max-height:250px;overflow-y:auto;z-index:10;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease; }
+        .plyr__aspect-dropdown.show { opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0); }
+        .plyr__aspect-option { display:block;width:100%;padding:10px 14px;background:transparent;border:0;color:#ccc;font-family:inherit;font-size:12px;text-align:left;cursor:pointer;transition:background 0.2s ease,color 0.2s ease;border-bottom:1px solid rgba(255,255,255,0.03);white-space:normal;word-break:break-word; }
+        .plyr__aspect-option:last-child { border-bottom:0; }
+        .plyr__aspect-option:hover { background:rgba(255,255,255,0.05);color:#fff; }
+        .plyr__aspect-option.active { background:rgba(229,9,20,0.15);color:#e50914;font-weight:500; }
+
+        @media (max-width: 768px) {
+            .player-wrapper { padding: 0; flex: none; }
+            .player-resizable-wrapper { width: 100%; max-width: 100%; height: auto; padding: 10px; }
+            .player-container { width: 100%; height: 100%; border-radius: 0; }
+            .resize-handle.handle-n,.resize-handle.handle-s { height:12px; }
+            .resize-handle.handle-w,.resize-handle.handle-e { width:12px; }
+            .resize-handle.handle-nw,.resize-handle.handle-ne,.resize-handle.handle-sw,.resize-handle.handle-se { width:16px;height:16px; }
+            .plyr { border-radius: 0; }
+            .plyr__control { padding: 10px !important; }
+            .plyr__volume input[type="range"] { display: none !important; }
+            .plyr__control[data-plyr="download"],.plyr__control[data-plyr="pip"],.plyr__control[data-plyr="airplay"] { display: none !important; }
+            .header { padding: 10px 12px; gap: 8px; }
+            .file-name { font-size: 0.8rem; }
+            .telegram-logo-link { width: 32px; height: 32px; }
+            .telegram-logo-link svg { width: 18px; height: 18px; }
+            .below-player { width: 100%; padding: 12px 12px 16px; }
+            .action-row { gap: 8px; }
+            .action-btn { min-width: 100px; padding: 10px 12px; font-size: 0.78rem; }
+            .player-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+            .player-btn { padding: 8px 10px; font-size: 0.75rem; }
+            .player-btn .p-icon { width: 24px; height: 24px; font-size: 0.85rem; }
+        }
+        @media (max-width: 480px) {
+            .header { padding: 8px 10px; }
+            .player-container { border-radius: 0; }
+            .plyr { border-radius: 0; }
+            .plyr__controls { padding: 6px !important; }
+            .plyr__control { padding: 6px !important; }
+            .plyr__control[data-plyr="rewind"],.plyr__control[data-plyr="fast-forward"] { display: none !important; }
+            .plyr__time { font-size: 10px !important; }
+            .plyr__controls > * { margin-left: 2px !important; }
+            .plyr__controls > *:first-child { margin-left: 0 !important; }
         }
     </style>
 </head>
 <body>
-<header>
-    <span class="logo">Filmotainment</span>
-    <div id="file-name">{file_name}</div>
-</header>
-<div class="container">
-    <div class="live-badge"><span class="live-dot"></span>ONLINE STREAM</div>
-
-    <!-- Player -->
-    <div class="player-wrap">
-        <video id="mainPlayer"
-               class="video-js vjs-theme-ft vjs-big-play-centered"
-               controls preload="auto" playsinline crossorigin="anonymous">
-            <source src="{src}" type="{mime_type}">
-            <p class="vjs-no-js">Please enable JavaScript or upgrade your browser.</p>
-        </video>
-        <div id="vidErr">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <h2>Stream Failed to Load</h2>
-            <p>The stream could not start. Try downloading the file below.</p>
+    <div class="header">
+        <div class="header-icon">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </div>
-    </div>
-
-    <!-- Controls panel -->
-    <div class="controls-panel">
-
-        <!-- Seek ±10s -->
-        <div class="seek-row">
-            <button class="seek-btn" id="seekBack" type="button">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/>
-                </svg>
-                -10s
-            </button>
-            <button class="seek-btn" id="seekFwd" type="button">
-                +10s
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Audio + Subtitle selectors -->
-        <div class="track-row">
-            <div class="track-select-wrap">
-                <span class="track-label">&#127911; Audio Track</span>
-                <select class="track-select" id="audioSelect" disabled>
-                    <option value="">Default</option>
-                </select>
-            </div>
-            <div class="track-select-wrap">
-                <span class="track-label">&#128250; Subtitles</span>
-                <select class="track-select" id="subSelect">
-                    <option value="off">Off</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Download -->
-        <a id="dlBtn" href="{src}" class="btn-dl" download>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download File
+        <div class="file-name">{file_name}</div>
+        <a class="telegram-logo-link" href="https://t.me/FT_Channels" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.87-2.11 5.85-2.52 2.78-1.16 3.36-1.36 3.74-1.36.08 0 .27.02.39.12.1.08.13.19.14.27.01.06.01.24 0 .24z"/></svg>
         </a>
     </div>
-</div>
 
-<footer>
-    <p>Powered by <a href="https://t.me/FT_Channels" class="ha-link" target="_blank" rel="noopener">Filmotainment</a></p>
-</footer>
+    <div class="player-wrapper">
+        <div class="player-resizable-wrapper">
+            <div class="player-container">
+                <video src="{src}" class="player" crossorigin="anonymous" playsinline preload="metadata"></video>
+            </div>
+            <div class="resize-handle handle-n"></div>
+            <div class="resize-handle handle-s"></div>
+            <div class="resize-handle handle-e"></div>
+            <div class="resize-handle handle-w"></div>
+            <div class="resize-handle handle-nw"></div>
+            <div class="resize-handle handle-ne"></div>
+            <div class="resize-handle handle-sw"></div>
+            <div class="resize-handle handle-se"></div>
+        </div>
+    </div>
 
-<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-<script>
-(function() {
-    var SRC = "{src}";
-    var MSG_ID = "{message_id}";
-    var errShown = false;
+    <div class="below-player">
+        <div class="action-row">
+            <a class="action-btn primary" id="dl-btn" href="{src}" download>
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                Download
+            </a>
+            <button class="action-btn" id="copy-btn" onclick="copyLink()">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                Copy Link
+            </button>
+            <button class="action-btn" id="reset-size-btn" onclick="resetPlayerSize()" style="display:none">
+                <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                Reset Size
+            </button>
+        </div>
 
-    function showErr() {
-        if (errShown) return;
-        errShown = true;
-        var e = document.getElementById("vidErr");
-        if (e) e.classList.add("show");
-    }
+        <div class="openin-card">
+            <div class="openin-header">
+                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                <span class="openin-title">Open in External Player</span>
+            </div>
+            <div class="openin-tabs">
+                <button class="openin-tab active" onclick="switchTab(this, 'desktop')">Desktop</button>
+                <button class="openin-tab" onclick="switchTab(this, 'mobile')">Android</button>
+                <button class="openin-tab" onclick="switchTab(this, 'ios')">iOS</button>
+            </div>
+            <div class="openin-content active" id="tab-desktop">
+                <div class="player-grid" id="grid-desktop"></div>
+            </div>
+            <div class="openin-content" id="tab-mobile">
+                <div class="player-grid" id="grid-mobile"></div>
+            </div>
+            <div class="openin-content" id="tab-ios">
+                <div class="player-grid" id="grid-ios"></div>
+            </div>
+        </div>
+    </div>
 
-    /* ── Seek buttons ── */
-    document.getElementById("seekBack").addEventListener("click", function() {
-        if (window._vjsPlayer) window._vjsPlayer.currentTime(Math.max(0, window._vjsPlayer.currentTime() - 10));
-    });
-    document.getElementById("seekFwd").addEventListener("click", function() {
-        if (window._vjsPlayer) window._vjsPlayer.currentTime(Math.min(window._vjsPlayer.duration() || 1e9, window._vjsPlayer.currentTime() + 10));
-    });
+    <footer>Powered by <a href="https://t.me/FT_Channels" target="_blank" rel="noopener">Filmotainment</a></footer>
 
-    /* ── Init Video.js ── */
-    var player = videojs("mainPlayer", {
-        fluid: false,
-        fill: true,
-        responsive: true,
-        playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
-        html5: {
-            nativeVideoTracks: true,
-            nativeAudioTracks: true,
-            nativeTextTracks: true
-        },
-        controlBar: {
-            children: [
-                "playToggle",
-                "volumePanel",
-                "currentTimeDisplay",
-                "timeDivider",
-                "durationDisplay",
-                "progressControl",
-                "remainingTimeDisplay",
-                "customControlSpacer",
-                "playbackRateMenuButton",
-                "pictureInPictureToggle",
-                "fullscreenToggle"
-            ]
-        }
-    });
-    window._vjsPlayer = player;
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <script>
+        var STREAM_URL = '{src}';
+        var FILE_NAME  = '{file_name}';
+        var MSG_ID     = '{message_id}';
 
-    /* -- Track state -- */
-    var currentAudioIdx = 0;   // currently selected audio stream index
-    var tracksData = { audio: [], subtitles: [] };
+        var player;
+        var fetchedTracks = null;
+        var currentAudioIdx = 0;
+        var currentSubIdx   = 'off';
 
-    player.src({ src: SRC, type: "{mime_type}" });
-
-    var audioSel = document.getElementById("audioSelect");
-    var subSel   = document.getElementById("subSelect");
-
-    /* ── Load track list from /api/tracks/ ── */
-    function loadTracks() {
-        fetch("/api/tracks/" + MSG_ID)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                tracksData.audio     = data.audio     || [];
-                tracksData.subtitles = data.subtitles || [];
-                buildAudioSelector();
-                buildSubSelector();
-            })
-            .catch(function() {
-                /* ffprobe not available — fall back to native browser tracks */
-                player.one("loadedmetadata", function() {
-                    setTimeout(buildNativeTracks, 400);
-                });
+        /* ── Plyr init ── */
+        document.addEventListener('DOMContentLoaded', function() {
+            player = new Plyr('.player', {
+                controls: [
+                    'play-large','rewind','play','fast-forward',
+                    'progress','current-time','duration',
+                    'mute','volume',
+                    'settings','pip','airplay','download','fullscreen'
+                ],
+                settings: ['captions','speed','loop'],
+                speed: { selected:1, options:[0.25,0.5,0.75,1,1.25,1.5,1.75,2] },
+                seekTime: 10,
+                tooltips: { controls:true, seek:true },
+                keyboard: { focused:true, global:true },
+                invertTime: false,
+                toggleInvert: false,
+                fullscreen: { enabled:true, fallback:true, iosNative:true },
+                storage: { enabled:true, key:'plyr' }
             });
-    }
 
-    /* Build audio <select> from ffprobe data */
-    function buildAudioSelector() {
-        var tracks = tracksData.audio;
-        if (tracks.length < 1) return;
-        audioSel.innerHTML = "";
-        tracks.forEach(function(t, i) {
-            var opt = document.createElement("option");
-            opt.value = i;                          /* position index, not stream index */
-            opt.dataset.streamIndex = t.index;      /* actual ffmpeg stream index */
-            opt.textContent = t.label || t.language || ("Audio " + (i + 1));
-            if (t.language) opt.textContent += " (" + t.language + ")";
-            if (i === 0) { opt.selected = true; }
-            audioSel.appendChild(opt);
+            /* ── Keyboard shortcuts ── */
+            document.addEventListener('keydown', function(e) {
+                if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+                switch(e.key.toLowerCase()) {
+                    case 'k': case ' ': e.preventDefault(); player.playing?player.pause():player.play(); break;
+                    case 'j': e.preventDefault(); player.rewind(); break;
+                    case 'l': e.preventDefault(); player.forward(); break;
+                    case 'm': e.preventDefault(); player.muted=!player.muted; break;
+                    case 'f': e.preventDefault(); player.fullscreen.toggle(); break;
+                    case 'arrowleft':  e.preventDefault(); player.currentTime-=5; break;
+                    case 'arrowright': e.preventDefault(); player.currentTime+=5; break;
+                    case 'arrowup':    e.preventDefault(); player.volume=Math.min(1,player.volume+0.05); break;
+                    case 'arrowdown':  e.preventDefault(); player.volume=Math.max(0,player.volume-0.05); break;
+                    case '0':case '1':case '2':case '3':case '4':
+                    case '5':case '6':case '7':case '8':case '9':
+                        e.preventDefault(); player.currentTime=player.duration*(parseInt(e.key)/10); break;
+                }
+            });
+
+            player.on('ready', function() {
+                tryInsertAudioSelector();
+                tryInsertSubSelector();
+                tryInsertAspectSelector();
+            });
+
+            /* ── Fetch audio + subtitle tracks ── */
+            fetch('/api/tracks/' + MSG_ID)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var audio = data.audio || [];
+                    var subs  = data.subtitles || [];
+                    if (audio.length > 0 || subs.length > 0) {
+                        fetchedTracks = { audio: audio, subtitles: subs };
+                        tryInsertAudioSelector();
+                        tryInsertSubSelector();
+                    }
+                })
+                .catch(function(err) { console.error('Track fetch failed:', err); });
+
+            /* ── Auto-rotate to landscape on fullscreen (mobile) ── */
+            player.on('enterfullscreen', function() {
+                try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); } catch(e){}
+            });
+            player.on('exitfullscreen', function() {
+                try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch(e){}
+            });
+
+            initResizing();
         });
-        audioSel.disabled = tracks.length < 2;
-        if (tracks.length > 1) {
-            document.querySelector(".track-select-wrap:first-child .track-label").textContent =
-                "Audio (" + tracks.length + " tracks)";
-        }
-    }
 
-    /* Build subtitle <select> from ffprobe data */
-    function buildSubSelector() {
-        var tracks = tracksData.subtitles;
-        subSel.innerHTML = "<option value='off'>Off</option>";
-        if (tracks.length === 0) {
-            var none = document.createElement("option");
-            none.disabled = true; none.textContent = "None in file";
-            subSel.appendChild(none);
-            return;
-        }
-        tracks.forEach(function(t, i) {
-            var opt = document.createElement("option");
-            opt.value = i;
-            opt.dataset.streamIndex = t.index;
-            opt.textContent = t.label || t.language || ("Sub " + (i + 1));
-            if (t.language) opt.textContent += " (" + t.language + ")";
-            subSel.appendChild(opt);
-        });
-        document.querySelector(".track-select-wrap:last-child .track-label").textContent =
-            "Subtitles (" + tracks.length + " found)";
-    }
+        /* ── Language map for track labels ── */
+        var LANG_MAP = {
+            eng:'English',en:'English',hin:'Hindi',hi:'Hindi',
+            tam:'Tamil',ta:'Tamil',tel:'Telugu',te:'Telugu',
+            mal:'Malayalam',ml:'Malayalam',kan:'Kannada',kn:'Kannada',
+            ben:'Bengali',bn:'Bengali',pan:'Punjabi',pa:'Punjabi',
+            guj:'Gujarati',gu:'Gujarati',mar:'Marathi',mr:'Marathi',
+            fre:'French',fra:'French',fr:'French',spa:'Spanish',es:'Spanish',
+            ger:'German',deu:'German',de:'German',rus:'Russian',ru:'Russian',
+            chi:'Chinese',zho:'Chinese',zh:'Chinese',jpn:'Japanese',ja:'Japanese',
+            kor:'Korean',ko:'Korean',ara:'Arabic',ar:'Arabic',
+            por:'Portuguese',pt:'Portuguese',ita:'Italian',it:'Italian',
+            tur:'Turkish',tr:'Turkish',dut:'Dutch',nld:'Dutch',nl:'Dutch'
+        };
 
-    /* Fallback: use Video.js native audioTracks when ffprobe is unavailable */
-    function buildNativeTracks() {
-        var vjsAudio = player.audioTracks();
-        if (vjsAudio && vjsAudio.length > 1) {
-            audioSel.innerHTML = "";
-            for (var i = 0; i < vjsAudio.length; i++) {
-                var t = vjsAudio[i];
-                var opt = document.createElement("option");
-                opt.value = i;
-                opt.textContent = t.label || t.language || ("Audio " + (i + 1));
-                if (t.enabled) opt.selected = true;
-                audioSel.appendChild(opt);
+        function resolveTrackLabel(track, idx) {
+            var lang = (track.language || '').toLowerCase().trim();
+            var label = track.label || '';
+            var name = LANG_MAP[lang] || '';
+            if (name) {
+                return idx === 0 ? name + ' (Default)' : name;
             }
-            audioSel.disabled = false;
-            document.querySelector(".track-select-wrap:first-child .track-label").textContent =
-                "Audio (" + vjsAudio.length + " tracks)";
-        }
-    }
-
-    /* ── Audio track switching ──
-       Strategy: reload the source with ?audio=N so the server (if ffmpeg is
-       available) re-muxes only the selected track. Restore playback position. */
-    audioSel.addEventListener("change", function() {
-        var selectedIdx = parseInt(this.value);
-        if (selectedIdx === currentAudioIdx) return;
-        currentAudioIdx = selectedIdx;
-
-        /* Try Video.js native audioTracks first (works for MP4 in Chrome/Edge) */
-        var vjsAudio = player.audioTracks();
-        if (vjsAudio && vjsAudio.length > 1) {
-            for (var i = 0; i < vjsAudio.length; i++) {
-                vjsAudio[i].enabled = (i === selectedIdx);
-            }
-            /* Native switch succeeded — no reload needed */
-            return;
+            if (label) return label;
+            return idx === 0 ? 'Default' : 'Track ' + (idx + 1);
         }
 
-        /* Native API unavailable (MKV in most browsers) — reload source with
-           ?audio=N parameter so server can filter the track, resuming at current time. */
-        var currentTime = player.currentTime() || 0;
-        var wasPlaying  = !player.paused();
-        var newSrc = SRC + "?audio=" + selectedIdx;
+        /* ── Audio Track Selector (in Plyr controls) ── */
+        function tryInsertAudioSelector() {
+            if (!fetchedTracks || fetchedTracks.audio.length < 2) return;
+            var plyr = document.querySelector('.plyr');
+            if (!plyr || plyr.querySelector('.plyr__audio-selector')) return;
+            var volCtrl = plyr.querySelector('.plyr__volume');
+            if (!volCtrl) return;
 
-        player.src({ src: newSrc, type: "{mime_type}" });
-        player.load();
-        player.one("loadedmetadata", function() {
-            player.currentTime(currentTime);
-            if (wasPlaying) player.play();
-        });
-    });
+            var wrapper = document.createElement('div');
+            wrapper.className = 'plyr__audio-selector';
+            var btn = document.createElement('button');
+            btn.className = 'plyr__audio-btn'; btn.type = 'button'; btn.title = 'Audio Tracks';
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+            var dropdown = document.createElement('div');
+            dropdown.className = 'plyr__audio-dropdown';
 
-    /* ── Subtitle switching ── */
-    subSel.addEventListener("change", function() {
-        var val = this.value;
-        /* Try native Video.js text tracks */
-        var vjsSubs = player.textTracks();
-        var found = false;
-        for (var i = 0; i < vjsSubs.length; i++) {
-            if (vjsSubs[i].kind === "metadata" || vjsSubs[i].kind === "chapters") continue;
-            if (val !== "off" && parseInt(val) === i) {
-                vjsSubs[i].mode = "showing";
-                found = true;
-            } else {
-                vjsSubs[i].mode = "hidden";
-            }
+            wrapper.appendChild(btn);
+            wrapper.appendChild(dropdown);
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                closeAllDropdowns(dropdown);
+                dropdown.classList.toggle('show');
+            });
+            document.addEventListener('click', function() { dropdown.classList.remove('show'); });
+
+            fetchedTracks.audio.forEach(function(track, idx) {
+                var opt = document.createElement('button');
+                opt.className = 'plyr__audio-option' + (idx === 0 ? ' active' : '');
+                opt.textContent = resolveTrackLabel(track, idx);
+                opt.addEventListener('click', function() {
+                    dropdown.querySelectorAll('.plyr__audio-option').forEach(function(o) { o.classList.remove('active'); });
+                    opt.classList.add('active');
+                    dropdown.classList.remove('show');
+                    switchAudioTrack(idx);
+                });
+                dropdown.appendChild(opt);
+            });
+
+            volCtrl.parentNode.insertBefore(wrapper, volCtrl.nextSibling);
         }
-        /* If no native sub tracks, reload with ?sub=N */
-        if (!found && val !== "off") {
-            var ct  = player.currentTime() || 0;
-            var wp  = !player.paused();
-            var ai  = currentAudioIdx;
-            var newSrc = SRC + "?audio=" + ai + "&sub=" + val;
-            player.src({ src: newSrc, type: "{mime_type}" });
-            player.load();
-            player.one("loadedmetadata", function() {
-                player.currentTime(ct);
+
+        /* ── Subtitle Selector (in Plyr controls) ── */
+        function tryInsertSubSelector() {
+            if (!fetchedTracks || fetchedTracks.subtitles.length < 1) return;
+            var plyr = document.querySelector('.plyr');
+            if (!plyr || plyr.querySelector('.plyr__sub-selector')) return;
+            var audioSel = plyr.querySelector('.plyr__audio-selector');
+            var volCtrl = plyr.querySelector('.plyr__volume');
+            var insertAfter = audioSel || volCtrl;
+            if (!insertAfter) return;
+
+            var wrapper = document.createElement('div');
+            wrapper.className = 'plyr__sub-selector';
+            var btn = document.createElement('button');
+            btn.className = 'plyr__sub-btn'; btn.type = 'button'; btn.title = 'Subtitles';
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6v-2zm0 4h8v2H6v-2zm10 0h2v2h-2v-2zm-6-4h8v2h-8v-2z"/></svg>';
+            var dropdown = document.createElement('div');
+            dropdown.className = 'plyr__sub-dropdown';
+
+            wrapper.appendChild(btn);
+            wrapper.appendChild(dropdown);
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                closeAllDropdowns(dropdown);
+                dropdown.classList.toggle('show');
+            });
+            document.addEventListener('click', function() { dropdown.classList.remove('show'); });
+
+            /* Off option */
+            var offOpt = document.createElement('button');
+            offOpt.className = 'plyr__sub-option active';
+            offOpt.textContent = 'Off';
+            offOpt.addEventListener('click', function() {
+                dropdown.querySelectorAll('.plyr__sub-option').forEach(function(o) { o.classList.remove('active'); });
+                offOpt.classList.add('active');
+                dropdown.classList.remove('show');
+                switchSubTrack('off');
+            });
+            dropdown.appendChild(offOpt);
+
+            fetchedTracks.subtitles.forEach(function(track, idx) {
+                var opt = document.createElement('button');
+                opt.className = 'plyr__sub-option';
+                opt.textContent = resolveTrackLabel(track, idx);
+                opt.addEventListener('click', function() {
+                    dropdown.querySelectorAll('.plyr__sub-option').forEach(function(o) { o.classList.remove('active'); });
+                    opt.classList.add('active');
+                    dropdown.classList.remove('show');
+                    switchSubTrack(idx);
+                });
+                dropdown.appendChild(opt);
+            });
+
+            insertAfter.parentNode.insertBefore(wrapper, insertAfter.nextSibling);
+        }
+
+        /* ── Audio track switching (source reload with ?audio=N) ── */
+        function switchAudioTrack(idx) {
+            if (idx === currentAudioIdx) return;
+            currentAudioIdx = idx;
+            var ct = player.currentTime;
+            var wp = player.playing;
+            var newSrc = STREAM_URL + '?audio=' + idx;
+            if (currentSubIdx !== 'off') newSrc += '&sub=' + currentSubIdx;
+            player.source = { type:'video', sources:[{ src:newSrc, type:'{mime_type}' }] };
+            player.once('loadedmetadata', function() {
+                player.currentTime = ct;
                 if (wp) player.play();
             });
         }
-    });
 
-    /* Start loading tracks */
-    loadTracks();
-
-    player.on("error", function() {
-        console.warn("Video.js error:", player.error());
-        showErr();
-    });
-
-    /* -- Auto-rotate to landscape on fullscreen (mobile) -- */
-    player.on("fullscreenchange", function() {
-        if (player.isFullscreen()) {
-            try {
-                if (screen.orientation && screen.orientation.lock) {
-                    screen.orientation.lock("landscape").catch(function() {});
-                }
-            } catch(e) {}
-        } else {
-            try {
-                if (screen.orientation && screen.orientation.unlock) {
-                    screen.orientation.unlock();
-                }
-            } catch(e) {}
+        /* ── Subtitle track switching ── */
+        function switchSubTrack(idx) {
+            currentSubIdx = idx;
+            if (idx === 'off' && currentAudioIdx === 0) {
+                var ct = player.currentTime;
+                var wp = player.playing;
+                player.source = { type:'video', sources:[{ src:STREAM_URL, type:'{mime_type}' }] };
+                player.once('loadedmetadata', function() {
+                    player.currentTime = ct;
+                    if (wp) player.play();
+                });
+                return;
+            }
+            var ct2 = player.currentTime;
+            var wp2 = player.playing;
+            var newSrc = STREAM_URL + '?audio=' + currentAudioIdx;
+            if (idx !== 'off') newSrc += '&sub=' + idx;
+            player.source = { type:'video', sources:[{ src:newSrc, type:'{mime_type}' }] };
+            player.once('loadedmetadata', function() {
+                player.currentTime = ct2;
+                if (wp2) player.play();
+            });
         }
-    });
 
-    setTimeout(function() {
-        if (player.paused() && player.currentTime() === 0 && !player.seeking()) {
-            showErr();
+        /* ── Aspect Ratio Selector ── */
+        var activeAspect = 'fit';
+        var aspectModes = [
+            { id:'fit',     label:'Fit (Default)',    width:'100%',height:'100%',fit:'contain',ratio:'auto' },
+            { id:'stretch', label:'Stretch',          width:'100%',height:'100%',fit:'fill',   ratio:'auto' },
+            { id:'zoom',    label:'Zoom / Crop',      width:'100%',height:'100%',fit:'cover',  ratio:'auto' },
+            { id:'16-9',    label:'16:9 Widescreen',  width:'auto',height:'auto',fit:'fill',   ratio:'16/9' },
+            { id:'9-16',    label:'9:16 Vertical',    width:'auto',height:'auto',fit:'fill',   ratio:'9/16' },
+            { id:'4-3',     label:'4:3 Standard',     width:'auto',height:'auto',fit:'fill',   ratio:'4/3' },
+            { id:'1-1',     label:'1:1 Square',       width:'auto',height:'auto',fit:'fill',   ratio:'1/1' },
+            { id:'21-9',    label:'21:9 Widescreen',  width:'auto',height:'auto',fit:'fill',   ratio:'21/9' },
+            { id:'2.35-1',  label:'2.35:1 Cinema',    width:'auto',height:'auto',fit:'fill',   ratio:'2.35/1' },
+            { id:'4-5',     label:'4:5 Portrait',     width:'auto',height:'auto',fit:'fill',   ratio:'4/5' }
+        ];
+
+        function tryInsertAspectSelector() {
+            var plyr = document.querySelector('.plyr');
+            if (!plyr || plyr.querySelector('.plyr__aspect-selector')) return;
+            var volCtrl = plyr.querySelector('.plyr__volume');
+            if (!volCtrl) return;
+
+            var wrapper = document.createElement('div');
+            wrapper.className = 'plyr__aspect-selector';
+            var btn = document.createElement('button');
+            btn.className = 'plyr__aspect-btn'; btn.type = 'button'; btn.title = 'Aspect Ratio';
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.89 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/></svg>';
+            var dropdown = document.createElement('div');
+            dropdown.className = 'plyr__aspect-dropdown';
+
+            wrapper.appendChild(btn);
+            wrapper.appendChild(dropdown);
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                closeAllDropdowns(dropdown);
+                dropdown.classList.toggle('show');
+            });
+            document.addEventListener('click', function() { dropdown.classList.remove('show'); });
+
+            aspectModes.forEach(function(mode) {
+                var opt = document.createElement('button');
+                opt.className = 'plyr__aspect-option' + (mode.id === activeAspect ? ' active' : '');
+                opt.textContent = mode.label;
+                opt.addEventListener('click', function() {
+                    dropdown.querySelectorAll('.plyr__aspect-option').forEach(function(o) { o.classList.remove('active'); });
+                    opt.classList.add('active');
+                    dropdown.classList.remove('show');
+                    setAspectRatio(mode.id);
+                });
+                dropdown.appendChild(opt);
+            });
+
+            /* Insert after subtitle or audio selector, or volume */
+            var subSel = plyr.querySelector('.plyr__sub-selector');
+            var audSel = plyr.querySelector('.plyr__audio-selector');
+            var target = subSel || audSel || volCtrl;
+            target.parentNode.insertBefore(wrapper, target.nextSibling);
         }
-    }, 25000);
-})();
-</script>
+
+        function setAspectRatio(modeId) {
+            activeAspect = modeId;
+            var mode = aspectModes.find(function(m) { return m.id === modeId; });
+            if (!mode) return;
+            var vid = document.querySelector('.player-container video');
+            if (!vid) return;
+            vid.style.setProperty('--video-width', mode.width);
+            vid.style.setProperty('--video-height', mode.height);
+            vid.style.setProperty('--video-object-fit', mode.fit);
+            vid.style.setProperty('--video-aspect-ratio', mode.ratio);
+        }
+
+        /* ── Close all custom dropdowns except the given one ── */
+        function closeAllDropdowns(except) {
+            document.querySelectorAll('.plyr__audio-dropdown,.plyr__sub-dropdown,.plyr__aspect-dropdown').forEach(function(d) {
+                if (d !== except) d.classList.remove('show');
+            });
+        }
+
+        /* ── Copy Link ── */
+        function copyLink() {
+            navigator.clipboard.writeText(STREAM_URL).then(function() {
+                var btn = document.getElementById('copy-btn');
+                btn.classList.add('copied');
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Copied!';
+                setTimeout(function() {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> Copy Link';
+                }, 2000);
+            });
+        }
+
+        /* ── External Player tabs ── */
+        function switchTab(el, tab) {
+            document.querySelectorAll('.openin-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.openin-content').forEach(function(c) { c.classList.remove('active'); });
+            el.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        function buildPlayerLinks() {
+            var url = STREAM_URL;
+            var encoded = encodeURIComponent(url);
+            var fileName = encodeURIComponent(FILE_NAME);
+            var intentBase = 'intent:' + url + '#Intent;action=android.intent.action.VIEW;type=video/*;';
+
+            var desktop = [
+                { href:'vlc://'+url,       icon:'vlc', letter:'V', label:'VLC' },
+                { href:'potplayer://'+url,  icon:'pot', letter:'P', label:'PotPlayer' },
+                { href:'mpv://'+url,        icon:'mpv', letter:'M', label:'MPV' },
+                { href:'kmplayer://'+url,   icon:'kmp', letter:'K', label:'KMPlayer' },
+                { href:'mpc://'+url,        icon:'mpc', letter:'M', label:'MPC-HC' },
+                { href:'iina://weblink?url='+encoded, icon:'iina', letter:'I', label:'IINA' }
+            ];
+            var mobile = [
+                { href:intentBase+'package=org.videolan.vlc;end', icon:'vlc', letter:'V', label:'VLC' },
+                { href:intentBase+'package=com.mxtech.videoplayer.ad;S.title='+fileName+';end', icon:'mx', letter:'MX', label:'MX Player' },
+                { href:intentBase+'package=com.mxtech.videoplayer.pro;S.title='+fileName+';end', icon:'mx', letter:'MX', label:'MX Player Pro' },
+                { href:intentBase+'package=com.young.simple.player;end', icon:'sp', letter:'S', label:'Splayer' },
+                { href:intentBase+'package=dev.anilbeesetti.nextplayer;S.title='+fileName+';end', icon:'nxt', letter:'N', label:'Next Player' },
+                { href:intentBase+'package=org.courville.nova;S.title='+fileName+';end', icon:'nova', letter:'N', label:'Nova Player' },
+                { href:intentBase+'package=is.xyz.mpv;S.title='+fileName+';end', icon:'mpv', letter:'M', label:'MPV Android' },
+                { href:intentBase+'package=com.brouken.player;end', icon:'jp', letter:'J', label:'Just Player' },
+                { href:intentBase+'package=com.newin.nplayer.pro;end', icon:'np', letter:'N', label:'nPlayer' }
+            ];
+            var ios = [
+                { href:'vlc-x-callback://x-callback-url/stream?url='+encoded, icon:'vlc', letter:'V', label:'VLC' },
+                { href:'infuse://x-callback-url/play?url='+encoded, icon:'infuse', letter:'I', label:'Infuse' },
+                { href:'nplayer://weblink?url='+encoded, icon:'np', letter:'N', label:'nPlayer' },
+                { href:'iina://weblink?url='+encoded, icon:'iina', letter:'I', label:'IINA' }
+            ];
+
+            function renderGrid(gridId, items) {
+                var grid = document.getElementById(gridId);
+                if (!grid) return;
+                items.forEach(function(p, i) {
+                    var a = document.createElement('a');
+                    a.className = 'player-btn';
+                    a.href = p.href;
+                    a.style.animationDelay = (0.35 + i * 0.05) + 's';
+                    a.innerHTML = '<div class="p-icon ' + p.icon + '">' + p.letter + '</div>' + p.label;
+                    grid.appendChild(a);
+                });
+            }
+            renderGrid('grid-desktop', desktop);
+            renderGrid('grid-mobile', mobile);
+            renderGrid('grid-ios', ios);
+        }
+        buildPlayerLinks();
+
+        /* ── Resizable player ── */
+        function resetPlayerSize() {
+            var wrapper = document.querySelector('.player-resizable-wrapper');
+            var belowPlayer = document.querySelector('.below-player');
+            if (wrapper) { wrapper.style.width=''; wrapper.style.height=''; wrapper.style.maxWidth=''; }
+            if (belowPlayer) { belowPlayer.style.width=''; belowPlayer.style.maxWidth=''; }
+            localStorage.removeItem('player-container-width');
+            localStorage.removeItem('player-container-height');
+            var resetBtn = document.getElementById('reset-size-btn');
+            if (resetBtn) resetBtn.style.display = 'none';
+        }
+
+        function initResizing() {
+            var wrapper = document.querySelector('.player-resizable-wrapper');
+            if (!wrapper) return;
+
+            var savedW = localStorage.getItem('player-container-width');
+            var savedH = localStorage.getItem('player-container-height');
+            if (savedW && savedH) {
+                var maxW = window.innerWidth - (window.innerWidth<=768?20:40);
+                var maxH = window.innerHeight - (window.innerWidth<=768?80:100);
+                var w = Math.min(parseInt(savedW), maxW);
+                var h = Math.min(parseInt(savedH), maxH);
+                wrapper.style.width = w+'px'; wrapper.style.height = h+'px'; wrapper.style.maxWidth = '100%';
+                var bp = document.querySelector('.below-player');
+                if (bp) { bp.style.width = w+'px'; bp.style.maxWidth = '100%'; }
+                var rb = document.getElementById('reset-size-btn');
+                if (rb) rb.style.display = 'inline-flex';
+            }
+
+            wrapper.querySelectorAll('.resize-handle').forEach(function(handle) {
+                handle.addEventListener('pointerdown', onPointerDown);
+                handle.addEventListener('dblclick', resetPlayerSize);
+            });
+
+            function onPointerDown(e) {
+                if (e.pointerType==='mouse' && e.button!==0) return;
+                e.preventDefault();
+                var handle = e.target;
+                var direction = '';
+                ['n','s','e','w','nw','ne','sw','se'].forEach(function(d) { if (handle.classList.contains('handle-'+d)) direction=d; });
+                var startX=e.clientX, startY=e.clientY, startW=wrapper.offsetWidth, startH=wrapper.offsetHeight;
+                wrapper.classList.add('resizing'); handle.classList.add('active-handle');
+                var overlay = document.createElement('div');
+                overlay.style.cssText = 'position:absolute;inset:0;z-index:90;cursor:'+window.getComputedStyle(handle).cursor;
+                wrapper.appendChild(overlay);
+
+                function onMove(me) {
+                    var dx=me.clientX-startX, dy=me.clientY-startY;
+                    var nw=startW, nh=startH;
+                    if (direction.includes('e')) nw=startW+dx; else if (direction.includes('w')) nw=startW-dx;
+                    if (direction.includes('s')) nh=startH+dy; else if (direction.includes('n')) nh=startH-dy;
+                    var minW=window.innerWidth<=768?280:320, minH=window.innerWidth<=768?150:180;
+                    var maxW2=window.innerWidth-(window.innerWidth<=768?20:40), maxH2=window.innerHeight-(window.innerWidth<=768?80:100);
+                    nw=Math.max(minW,Math.min(nw,maxW2)); nh=Math.max(minH,Math.min(nh,maxH2));
+                    wrapper.style.width=nw+'px'; wrapper.style.height=nh+'px'; wrapper.style.maxWidth='100%';
+                    var bp=document.querySelector('.below-player');
+                    if (bp) { bp.style.width=nw+'px'; bp.style.maxWidth='100%'; }
+                }
+                function onUp() {
+                    wrapper.classList.remove('resizing'); handle.classList.remove('active-handle');
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                    localStorage.setItem('player-container-width', wrapper.offsetWidth);
+                    localStorage.setItem('player-container-height', wrapper.offsetHeight);
+                    var rb=document.getElementById('reset-size-btn'); if (rb) rb.style.display='inline-flex';
+                    document.removeEventListener('pointermove',onMove);
+                    document.removeEventListener('pointerup',onUp);
+                    document.removeEventListener('pointercancel',onUp);
+                }
+                document.addEventListener('pointermove',onMove);
+                document.addEventListener('pointerup',onUp);
+                document.addEventListener('pointercancel',onUp);
+            }
+        }
+    </script>
 </body>
 </html>
 """
@@ -3104,7 +3479,7 @@ async def media_watch(message_id):
     else:
         resolved_mime = _mt.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
 
-    # Browsers/Video.js reject non-standard MIME types like video/x-matroska before even
+    # Browsers/Plyr reject non-standard MIME types like video/x-matroska before even
     # trying to play. Use video/mp4 as the declared source type universally — the actual
     # bytes and codec negotiation happen at the HTTP level regardless.
     player_mime = 'video/mp4'
