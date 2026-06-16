@@ -394,6 +394,27 @@ webapp_template = """
             background: linear-gradient(to top, rgba(22,22,31,0.9), transparent);
             pointer-events: none;
         }
+        /* ── Mute/Unmute Button Overlay ── */
+        .mute-toggle {
+            position: absolute; bottom: 16px; right: 16px; z-index: 10;
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+            border: 1px solid rgba(255,255,255,0.12);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 20px; transition: background 0.2s, transform 0.2s;
+        }
+        .mute-toggle:hover { background: rgba(0,0,0,0.85); transform: scale(1.08); }
+        .mute-toggle:active { transform: scale(0.94); }
+        /* ── Close Button on Top ── */
+        .modal-close-top {
+            position: absolute; top: 12px; right: 12px; z-index: 20;
+            width: 38px; height: 38px; border-radius: 50%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.15);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 18px; transition: background 0.2s, transform 0.2s;
+        }
+        .modal-close-top:hover { background: var(--accent); transform: scale(1.08); }
         .detail-source-row {
             display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px 0;
         }
@@ -1074,7 +1095,14 @@ webapp_template = """
     <div class="modal-sheet" id="modalSheet">
         <div class="modal-handle"></div>
         <div class="detail-scroll" id="detailScroll">
-        <div class="detail-media" id="detailMedia"></div>
+        <div class="detail-media" id="detailMedia">
+            <button class="modal-close-top" id="modalCloseTop" onclick="closeModal()" aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <button class="mute-toggle" id="muteToggle" onclick="toggleMute()" aria-label="Toggle Sound">
+                <span id="muteIcon">🔇</span>
+            </button>
+        </div>
         <div class="modal-header" id="modalHeader">
             <div class="modal-poster-placeholder" id="modalPosterWrap">🎬</div>
             <div class="modal-info" id="modalInfo"></div>
@@ -1678,6 +1706,34 @@ function resetDetailSections() {
     });
 }
 
+function toggleMute() {
+    const iframe = document.querySelector('#detailMedia iframe');
+    if (!iframe) return;
+    const muteIcon = document.getElementById('muteIcon');
+    const currentSrc = iframe.src;
+    try {
+        const u = new URL(currentSrc);
+        const isMuted = u.searchParams.get('mute') === '1';
+        if (isMuted) {
+            u.searchParams.set('mute', '0');
+            muteIcon.textContent = '🔊';
+        } else {
+            u.searchParams.set('mute', '1');
+            muteIcon.textContent = '🔇';
+        }
+        iframe.src = u.toString();
+    } catch(e) {
+        // fallback: toggle via replacing
+        if (currentSrc.includes('mute=1')) {
+            iframe.src = currentSrc.replace('mute=1', 'mute=0');
+            muteIcon.textContent = '🔊';
+        } else {
+            iframe.src = currentSrc.includes('mute=0') ? currentSrc.replace('mute=0', 'mute=1') : currentSrc + '&mute=1';
+            muteIcon.textContent = '🔇';
+        }
+    }
+}
+
 function renderDetailMedia(details) {
     const media = document.getElementById('detailMedia');
     if (details.trailer && details.trailer.embed) {
@@ -1689,15 +1745,20 @@ function renderDetailMedia(details) {
             u.searchParams.set('mute', '1');
             u.searchParams.set('rel', '0');
             u.searchParams.set('modestbranding', '1');
+            u.searchParams.set('controls', '0');
             embedUrl = u.toString();
         } catch(e) {
-            embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'autoplay=1&mute=1&rel=0';
+            embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'autoplay=1&mute=1&rel=0&controls=0';
         }
         media.innerHTML = `<iframe src="${embedUrl}" title="${escapeHTML(details.title)} trailer" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+        document.getElementById('muteToggle').style.display = 'flex';
+        document.getElementById('muteIcon').textContent = '🔇';
     } else if (details.backdrop || details.poster) {
         media.innerHTML = `<img src="${details.backdrop || details.poster}" alt="${escapeHTML(details.title)} image">`;
+        document.getElementById('muteToggle').style.display = 'none';
     } else {
         media.innerHTML = `<div class="modal-loading">No trailer or backdrop available.</div>`;
+        document.getElementById('muteToggle').style.display = 'none';
     }
 }
 
