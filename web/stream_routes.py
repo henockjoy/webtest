@@ -519,7 +519,7 @@ async def _background_track_probe(message_id: int):
             _TRACK_CACHE[message_id] = ({"audio": [], "subtitles": [], "error": "no ffprobe"}, _time.monotonic())
             return
         
-        # Probe via download URL — short timeout so it never holds up the server
+        # Probe via public download URL (works on Railway and cloud platforms)
         stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
         proc = await asyncio.create_subprocess_exec(
             "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
@@ -705,8 +705,8 @@ async def subtitle_download_handler(request):
     else:
         sub_codec = "srt"
 
-    # Build localhost URL to avoid recursion
-    stream_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+    # Build URL for ffmpeg to read from — use public URL for Railway compatibility
+    stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
 
     # Determine the output format for ffmpeg
     if sub_codec == "webvtt":
@@ -1514,9 +1514,9 @@ async def media_download(request, message_id: int):
 
     ffmpeg_bin = _shutil.which('ffmpeg')
     if ffmpeg_bin and (audio_idx is not None or sub_idx is not None):
-        # Build a streaming URL for ffmpeg to read from — use localhost to avoid
-        # external networking issues and prevent recursion loops
-        stream_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+        # Build a streaming URL for ffmpeg to read from
+        # Use the public URL (works on Railway and other cloud platforms)
+        stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
 
         cmd = [
             ffmpeg_bin,
