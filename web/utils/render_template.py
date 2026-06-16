@@ -123,7 +123,7 @@ webapp_template = """
             padding: 8px 4px; flex-shrink: 0;
             transition: opacity 0.2s, transform 0.15s;
         }
-        .search-close:hover { opacity: 0.8; }
+        .search-close:hover { opacity: 0.8;
         .search-close:active { transform: scale(0.96); }
         .search-suggestion {
             grid-column: 1 / -1; color: var(--text2); font-size: 13px;
@@ -1765,70 +1765,165 @@ function renderDetailMedia(details) {
 function renderSources(details) {
     const links = details.links || {};
     const chips = [];
-    if (links.imdb) chips.push(`<a class="source-chip" href="${links.imdb}" target="_blank" rel="noopener">IMDb</a>`);
-    if (links.tvdb) chips.push(`<a class="source-chip" href="${links.tvdb}" target="_blank" rel="noopener">TVDB</a>`);
-    if (links.mal) chips.push(`<a class="source-chip" href="${links.mal}" target="_blank" rel="noopener">MyAnimeList</a>`);
-    if (links.tmdb) chips.push(`<a class="source-chip" href="${links.tmdb}" target="_blank" rel="noopener">TMDB</a>`);
-    document.getElementById('detailSources').innerHTML = chips.join('');
+    if (links.tmdb) chips.push(`<a class="source-chip chip-tmdb" href="${links.tmdb}" target="_blank" rel="noopener">TMDB</a>`);
+    if (links.imdb) chips.push(`<a class="source-chip chip-imdb" href="${links.imdb}" target="_blank" rel="noopener">IMDb</a>`);
+    if (links.tvdb) chips.push(`<a class="source-chip chip-tvdb" href="${links.tvdb}" target="_blank" rel="noopener">TVDB</a>`);
+    if (links.mal) chips.push(`<a class="source-chip chip-mal" href="${links.mal}" target="_blank" rel="noopener">MyAnimeList</a>`);
+    document.getElementById('detailSources').innerHTML = chips.length ? chips.join('') : '';
 }
 
 function renderStats(details) {
     const imdb = details.external?.imdb || {};
     const tvdb = details.external?.tvdb || {};
     const mal = details.external?.myanimelist || {};
-    const values = [
-        ['Rating', details.rating ? `${details.rating}/10${details.votes ? ` (${details.votes} votes)` : ''}` : 'Not rated'],
-        ['IMDb', imdb.rating ? `${imdb.rating}/10${imdb.votes ? ` (${imdb.votes})` : ''}` : 'Not available'],
-        ['Status', details.status || tvdb.status || 'Unknown'],
-        ['Runtime', details.runtime || 'Unknown'],
-        ['Quote', imdb.quote || details.tagline || 'None listed'],
-        ['Rank', mal.rank ? `#${mal.rank}` : (mal.popularity ? `Popularity #${mal.popularity}` : 'Not listed')]
-    ];
-    document.getElementById('detailStats').innerHTML = `
-        <div class="detail-section-title">Details</div>
-        <div class="detail-grid">
-            ${values.map(([label, value]) => `<div class="detail-stat"><div class="detail-stat-label">${label}</div><div class="detail-stat-value">${escapeHTML(value)}</div></div>`).join('')}
-        </div>
-        ${details.keywords?.length ? `<div class="modal-genres" style="margin-top:12px">${details.keywords.map(x => `<span class="genre-pill">${escapeHTML(x)}</span>`).join('')}</div>` : ''}
-    `;
+    const providers = details.providers || {};
+    
+    // Build a Netflix-like info grid
+    let html = `<div class="detail-section-title">Details</div><div class="detail-grid">`;
+    
+    // TMDB Rating
+    html += `<div class="detail-stat">
+        <div class="detail-stat-label"><span class="chip-tmdb" style="display:inline-block;padding:0 6px;border-radius:3px;font-size:9px">TMDB</span> Rating</div>
+        <div class="detail-stat-value">${details.rating ? `⭐ ${details.rating}/10${details.votes ? ` <span style="color:var(--text3);font-weight:400">(${details.votes.toLocaleString()} votes)</span>` : ''}` : 'Not rated'}</div>
+    </div>`;
+    
+    // IMDb Rating
+    if (imdb.rating) {
+        html += `<div class="detail-stat">
+            <div class="detail-stat-label"><span class="chip-imdb" style="display:inline-block;padding:0 6px;border-radius:3px;font-size:9px">IMDb</span> Rating</div>
+            <div class="detail-stat-value">⭐ ${imdb.rating}/10${imdb.votes ? ` <span style="color:var(--text3);font-weight:400">(${imdb.votes})</span>` : ''}</div>
+        </div>`;
+    }
+    
+    // IMDb Rated (PG-13, R, etc.)
+    if (imdb.rated) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">Age Rating</div><div class="detail-stat-value">${escapeHTML(imdb.rated)}</div></div>`;
+    }
+    
+    // Status
+    html += `<div class="detail-stat"><div class="detail-stat-label">Status</div><div class="detail-stat-value">${escapeHTML(details.status || tvdb.status || 'Unknown')}</div></div>`;
+    
+    // Runtime
+    if (details.runtime) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">Runtime</div><div class="detail-stat-value">${escapeHTML(details.runtime)}</div></div>`;
+    }
+    
+    // TVDB Network
+    if (tvdb.network) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">Network</div><div class="detail-stat-value">${escapeHTML(tvdb.network)}</div></div>`;
+    }
+    
+    // Aired Year
+    if (details.year) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">Year</div><div class="detail-stat-value">${escapeHTML(details.year)}</div></div>`;
+    }
+    
+    // MAL Rank
+    if (mal.rank) {
+        html += `<div class="detail-stat"><div class="detail-stat-label"><span class="chip-mal" style="display:inline-block;padding:0 6px;border-radius:3px;font-size:9px">MAL</span> Rank</div><div class="detail-stat-value">#${mal.rank}${mal.popularity ? ` · Popularity #${mal.popularity}` : ''}</div></div>`;
+    } else if (mal.popularity) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">MAL Popularity</div><div class="detail-stat-value">#${mal.popularity}</div></div>`;
+    }
+    
+    // MAL Members
+    if (mal.members) {
+        html += `<div class="detail-stat"><div class="detail-stat-label">MAL Members</div><div class="detail-stat-value">${mal.members.toLocaleString()}</div></div>`;
+    }
+    
+    // Awards / Quote
+    if (imdb.awards && imdb.awards !== 'N/A') {
+        html += `<div class="detail-stat" style="grid-column:span 2"><div class="detail-stat-label">Awards</div><div class="detail-stat-value">${escapeHTML(imdb.awards)}</div></div>`;
+    }
+    
+    // Box Office
+    if (imdb.box_office && imdb.box_office !== 'N/A') {
+        html += `<div class="detail-stat"><div class="detail-stat-label">Box Office</div><div class="detail-stat-value">${escapeHTML(imdb.box_office)}</div></div>`;
+    }
+    
+    html += `</div>`;
+    
+    // Keywords
+    if (details.keywords?.length) {
+        html += `<div class="modal-genres" style="margin-top:12px">${details.keywords.map(x => `<span class="genre-pill">${escapeHTML(x)}</span>`).join('')}</div>`;
+    }
+    
+    // Providers (Netflix, Prime, etc.)
+    if (providers.flatrate?.length || providers.rent?.length || providers.buy?.length) {
+        html += `<div class="detail-section-title" style="margin-top:16px">Where to Watch</div><div style="display:flex;flex-wrap:wrap;gap:6px">`;
+        if (providers.link) {
+            html += `<a href="${providers.link}" target="_blank" rel="noopener" style="text-decoration:none">`;
+        }
+        const allPro = [...(providers.flatrate||[]), ...(providers.rent||[]), ...(providers.buy||[])];
+        allPro.slice(0,8).forEach(p => {
+            html += `<span class="genre-pill" style="background:rgba(229,9,20,0.1);border-color:rgba(229,9,20,0.2)">${escapeHTML(p)}</span>`;
+        });
+        if (allPro.length > 8) html += `<span class="genre-pill">+${allPro.length-8} more</span>`;
+        if (providers.link) html += `</a>`;
+        html += `</div>`;
+    }
+    
+    document.getElementById('detailStats').innerHTML = html;
 }
 
 function renderPeople(details) {
-    if (!details.cast?.length) return;
-    document.getElementById('detailCast').innerHTML = `
-        <div class="detail-section-title">Cast</div>
+    const cast = details.cast || [];
+    const crew = details.crew || [];
+    if (!cast.length && !crew.length) return;
+    
+    let html = '';
+    
+    // Director / Writer highlights from crew
+    const directors = crew.filter(p => p.role === 'Director');
+    const writers = crew.filter(p => p.role === 'Writer' || p.role === 'Screenplay');
+    if (directors.length) {
+        html += `<div class="detail-section-title">Directed By</div>
+        <div class="detail-strip" style="margin-bottom:12px">
+            ${directors.map(p => `<div class="person-card"><div class="person-photo poster-placeholder" style="background:linear-gradient(135deg,var(--accent),#ff6b6b);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center">${(p.name||'?')[0]}</div>
+            <div class="person-name">${escapeHTML(p.name)}</div><div class="person-role">Director</div></div>`).join('')}
+        </div>`;
+    }
+    
+    // Cast
+    if (cast.length) {
+        html += `<div class="detail-section-title">Cast · ${cast.length}</div>
         <div class="detail-strip">
-            ${details.cast.map(p => `
+            ${cast.map(p => `
                 <div class="person-card">
-                    ${p.image ? `<img class="person-photo" src="${p.image}" alt="${escapeHTML(p.name)}">` : `<div class="person-photo poster-placeholder">?</div>`}
+                    ${p.image ? `<img class="person-photo" src="${p.image}" alt="${escapeHTML(p.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="person-photo poster-placeholder" style="display:none;font-size:14px;font-weight:700">${(p.name||'?')[0]}</div>` : `<div class="person-photo poster-placeholder" style="font-size:14px;font-weight:700">${(p.name||'?')[0]}</div>`}
                     <div class="person-name">${escapeHTML(p.name)}</div>
                     <div class="person-role">${escapeHTML(p.role)}</div>
                 </div>
             `).join('')}
-        </div>
-    `;
+        </div>`;
+    }
+    
+    document.getElementById('detailCast').innerHTML = html;
 }
 
 function renderImages(details) {
-    const images = [...(details.images?.backdrops || []), ...(details.images?.posters || [])].filter(Boolean).slice(0, 16);
+    const images = [...(details.images?.backdrops || []), ...(details.images?.posters || [])].filter(Boolean).slice(0, 20);
     if (!images.length) return;
     document.getElementById('detailImages').innerHTML = `
-        <div class="detail-section-title">Images</div>
+        <div class="detail-section-title">Gallery</div>
         <div class="detail-strip">
-            ${images.map(src => `<img class="image-thumb" src="${src}" alt="${escapeHTML(details.title)} image" loading="lazy">`).join('')}
+            ${images.map(src => `<img class="image-thumb" src="${src}" alt="" loading="lazy">`).join('')}
         </div>
     `;
 }
 
 function renderQuotes(details) {
-    // Only show tagline and IMDb quote — no user reviews
     const quotes = [];
     if (details.tagline) quotes.push({author: details.title, quote: details.tagline});
     if (details.external?.imdb?.quote) quotes.push({author: 'IMDb', quote: details.external.imdb.quote});
-    if (!quotes.length) return;
+    if (!quotes.length) { document.getElementById('detailQuotes').innerHTML = ''; return; }
     document.getElementById('detailQuotes').innerHTML = `
-        <div class="detail-section-title">Quote</div>
-        ${quotes.map(q => `<div class="quote-card">"${escapeHTML(q.quote)}"<br><b>${escapeHTML(q.author || '')}</b></div>`).join('')}
+        <div class="detail-section-title">Notable Quote</div>
+        ${quotes.map(q => `
+            <div class="quote-card" style="border-left:3px solid var(--accent);background:rgba(229,9,20,0.06);padding:14px 16px;border-radius:var(--radius-sm);margin-bottom:8px">
+                <div style="font-size:14px;font-style:italic;color:#e5e5e5;line-height:1.6">"${escapeHTML(q.quote)}"</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:6px;font-weight:600">— ${escapeHTML(q.author)}</div>
+            </div>
+        `).join('')}
     `;
 }
 
