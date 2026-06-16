@@ -496,7 +496,7 @@ async def stream_file_handler(request):
         return web.Response(text=error_tmplt, content_type='text/html')
 
 
-# ── Track data cache ────────────────────────────────────────────────────────
+# ── Track data — lazily probed and cached ────────────────────────────────
 _TRACK_CACHE = {}          # {message_id: (track_data_dict, timestamp)}
 _TRACK_CACHE_TTL = 600     # 10 minutes — tracks don't change
 
@@ -507,102 +507,137 @@ async def _get_cached_tracks(message_id: int):
         data, ts = entry
         if _time.monotonic() - ts < _TRACK_CACHE_TTL:
             return data
-    # Probe via download endpoint (self-referential local HTTP)
-    data = await _probe_tracks(message_id)
-    if data and not data.get("error"):
-        _TRACK_CACHE[message_id] = (data, _time.monotonic())
+    # Fire probe in background — don't wait for it
+    asyncio.ensure_future(_background_track_probe(message_id))
+    return {"audio": [], "subtitles": [], "error": None}
+
+async def _background_track_probe(message_id: int):
+    """Probe tracks in background and cache them. Never blocks a request."""
+    import asyncio, subprocess, json as _json, shutil
+    try:
+        if not shutil.which("ffprobe"):
+            _TRACK_CACHE[message_id] = ({"audio": [], "subtitles": [], "error": "no ffprobe"}, _time.monotonic())
+            return
+        
+        # Probe via download URL — short timeout so it never holds up the server
+        stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
+            "-probesize", "500000", "-analyzeduration", "100000",
+            stream_url,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+        except asyncio.TimeoutError:
+            try: proc.kill()
+            except: pass
+            # Try localhost as fallback
+            try:
+                local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+                proc2 = await asyncio.create_subprocess_exec(
+                    "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
+                    "-probesize", "200000", "-analyzeduration", "50000",
+                    local_url,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                stdout, _ = await asyncio.wait_for(proc2.communicate(), timeout=8)
+            except:
+                _TRACK_CACHE[message_id] = ({"audio": [], "subtitles": [], "error": "timeout"}, _time.monotonic())
+                return
+
+        data = _json.loads(stdout.decode()) if stdout else {}
+        streams = data.get("streams", [])
+        audio, subs = [], []
+        for s in streams:
+            ct = s.get("codec_type", "")
+            tags = s.get("tags", {})
+            cn = s.get("codec_name", "")
+            lb = tags.get("title") or (f"{tags.get('language', '').upper()} ({cn})" if tags.get("language") else (cn or f"Track {s.get('index',0)}"))
+            lg = tags.get("language", "")
+            idx = s.get("index", 0)
+            dp = s.get("disposition", {})
+            if ct == "audio":
+                audio.append({"index": idx, "label": lb, "language": lg, "codec": cn,
+                    "channels": s.get("channels"), "sample_rate": s.get("sample_rate"),
+                    "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
+            elif ct == "subtitle":
+                subs.append({"index": idx, "label": lb, "language": lg, "codec": cn,
+                    "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
+        _TRACK_CACHE[message_id] = ({"audio": audio, "subtitles": subs, "error": None}, _time.monotonic())
         if len(_TRACK_CACHE) > 200:
             oldest = min(_TRACK_CACHE, key=lambda k: _TRACK_CACHE[k][1])
             del _TRACK_CACHE[oldest]
-    return data
+    except Exception:
+        pass  # background probe failure is non-fatal
 
-async def _probe_tracks(message_id: int):
-    """Use ffprobe on the download stream to extract audio/subtitle track info."""
-    import asyncio, subprocess, json as _json, urllib.parse as _up, shutil
+
+async def _probe_sync(message_id: int):
+    """Synchronous probe — used when subtitle download needs track data.
+    Waits for and returns track data, unlike background probe which fires and forgets."""
+    import subprocess, json as _json, shutil
     if not shutil.which("ffprobe"):
-        return {"audio": [], "subtitles": [], "error": "ffprobe not available"}
-
-    # Use localhost URL to avoid external networking issues
-    local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
-
+        return {"audio": [], "subtitles": [], "error": "no ffprobe"}
+    
+    # Try public URL first
+    stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
     proc = await asyncio.create_subprocess_exec(
-        "ffprobe",
-        "-v", "quiet",
-        "-print_format", "json",
-        "-show_streams",
-        "-probesize", "5000000",       # only read first 5 MB
-        "-analyzeduration", "500000",  # 0.5 second analysis
-        local_url,
+        "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
+        "-probesize", "500000", "-analyzeduration", "100000",
+        stream_url,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
     except asyncio.TimeoutError:
+        try: proc.kill()
+        except: pass
         try:
-            proc.kill()
-        except Exception:
-            pass
-        return {"audio": [], "subtitles": [], "error": "ffprobe timeout"}
+            local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+            proc2 = await asyncio.create_subprocess_exec(
+                "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
+                "-probesize", "200000", "-analyzeduration", "50000",
+                local_url,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            stdout, _ = await asyncio.wait_for(proc2.communicate(), timeout=8)
+        except:
+            return {"audio": [], "subtitles": [], "error": "timeout"}
 
     data = _json.loads(stdout.decode()) if stdout else {}
     streams = data.get("streams", [])
-
-    audio = []
-    subs  = []
+    audio, subs = [], []
     for s in streams:
-        codec_type = s.get("codec_type", "")
+        ct = s.get("codec_type", "")
         tags = s.get("tags", {})
-        codec_name = s.get("codec_name", "")
-        label = tags.get("title") or ""
-        lang  = tags.get("language", "")
-        idx   = s.get("index", 0)
-        disp  = s.get("disposition", {})
-
-        # Resolve a human-readable label
-        if not label:
-            if lang:
-                label = f"{lang.upper()} ({codec_name})"
-            else:
-                label = codec_name or f"Track {idx}"
-
-        if codec_type == "audio":
-            audio.append({
-                "index": idx,
-                "label": label,
-                "language": lang,
-                "codec": codec_name,
-                "channels": s.get("channels"),
-                "sample_rate": s.get("sample_rate"),
-                "default": bool(disp.get("default")),
-                "forced": bool(disp.get("forced")),
-            })
-        elif codec_type == "subtitle":
-            subs.append({
-                "index": idx,
-                "label": label,
-                "language": lang,
-                "codec": codec_name,
-                "default": bool(disp.get("default")),
-                "forced": bool(disp.get("forced")),
-            })
-
-    return {"audio": audio, "subtitles": subs, "error": None}
+        cn = s.get("codec_name", "")
+        lb = tags.get("title") or (f"{tags.get('language', '').upper()} ({cn})" if tags.get("language") else (cn or f"Track {s.get('index',0)}"))
+        lg = tags.get("language", "")
+        idx = s.get("index", 0)
+        dp = s.get("disposition", {})
+        if ct == "audio":
+            audio.append({"index": idx, "label": lb, "language": lg, "codec": cn,
+                "channels": s.get("channels"), "sample_rate": s.get("sample_rate"),
+                "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
+        elif ct == "subtitle":
+            subs.append({"index": idx, "label": lb, "language": lg, "codec": cn,
+                "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
+    result = {"audio": audio, "subtitles": subs, "error": None}
+    # Also cache it
+    _TRACK_CACHE[message_id] = (result, _time.monotonic())
+    return result
 
 
 @routes.get("/api/tracks/{message_id}")
 async def tracks_handler(request):
-    """Extract audio and subtitle track info using ffprobe on the download stream.
+    """Extract audio and subtitle track info using ffprobe.
     
-    Returns JSON with audio[] and subtitles[]. Each track has:
-      - index: stream index for ffmpeg -map
-      - label: human-readable name
-      - language: ISO 639 language code (if present)
-      - codec: codec name (e.g. aac, mp3, eac3, srt, ass)
-      - default: boolean, whether this is the default track
-      - forced: boolean, whether forced playback is flagged
-    Audio tracks additionally have:
-      - channels: number of audio channels
-      - sample_rate: audio sample rate in Hz
+    Returns immediately with cached data (or empty array if not yet probed).
+    Probing happens in the background — first request gets empty tracks,
+    subsequent requests (or page refresh) get the probed data.
+    
+    Track fields: index, label, language, codec, default, forced.
+    Audio additionally: channels, sample_rate.
     """
     try:
         message_id = int(request.match_info['message_id'])
@@ -611,7 +646,6 @@ async def tracks_handler(request):
     except (ValueError, TypeError):
         return web.json_response({"audio": [], "subtitles": [], "error": "invalid message_id"})
     except Exception as e:
-        import traceback
         return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
 
@@ -633,8 +667,11 @@ async def subtitle_download_handler(request):
     if not _sh.which('ffmpeg'):
         return web.json_response({"error": "ffmpeg not available"}, status=503)
 
-    # Get track metadata to determine format
-    tracks = await _probe_tracks(message_id)
+    # Get track metadata from cache (fire probe if needed)
+    tracks = await _get_cached_tracks(message_id)
+    if not tracks.get("subtitles"):
+        # If cache was empty, wait for probe synchronously (subtitle download is explicit action)
+        tracks = await _probe_sync(message_id)
     sub_track = None
     for s in tracks.get("subtitles", []):
         if s["index"] == sub_idx:
