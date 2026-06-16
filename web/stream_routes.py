@@ -3,7 +3,7 @@ import secrets
 import mimetypes
 import urllib.parse
 import html
-from info import BIN_CHANNEL, URL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
+from info import BIN_CHANNEL, URL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, PORT
 try:
     from info import OMDB_API_KEY
 except ImportError:
@@ -496,53 +496,240 @@ async def stream_file_handler(request):
         return web.Response(text=error_tmplt, content_type='text/html')
 
 
+# ── Track data cache ────────────────────────────────────────────────────────
+_TRACK_CACHE = {}          # {message_id: (track_data_dict, timestamp)}
+_TRACK_CACHE_TTL = 600     # 10 minutes — tracks don't change
+
+async def _get_cached_tracks(message_id: int):
+    """Return cached track data or probe via ffprobe and cache it."""
+    entry = _TRACK_CACHE.get(message_id)
+    if entry:
+        data, ts = entry
+        if _time.monotonic() - ts < _TRACK_CACHE_TTL:
+            return data
+    # Probe via download endpoint (self-referential local HTTP)
+    data = await _probe_tracks(message_id)
+    if data and not data.get("error"):
+        _TRACK_CACHE[message_id] = (data, _time.monotonic())
+        if len(_TRACK_CACHE) > 200:
+            oldest = min(_TRACK_CACHE, key=lambda k: _TRACK_CACHE[k][1])
+            del _TRACK_CACHE[oldest]
+    return data
+
+async def _probe_tracks(message_id: int):
+    """Use ffprobe on the download stream to extract audio/subtitle track info."""
+    import asyncio, subprocess, json as _json, urllib.parse as _up, shutil
+    if not shutil.which("ffprobe"):
+        return {"audio": [], "subtitles": [], "error": "ffprobe not available"}
+
+    # Use localhost URL to avoid external networking issues
+    local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+
+    proc = await asyncio.create_subprocess_exec(
+        "ffprobe",
+        "-v", "quiet",
+        "-print_format", "json",
+        "-show_streams",
+        "-probesize", "5000000",       # only read first 5 MB
+        "-analyzeduration", "500000",  # 0.5 second analysis
+        local_url,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return {"audio": [], "subtitles": [], "error": "ffprobe timeout"}
+
+    data = _json.loads(stdout.decode()) if stdout else {}
+    streams = data.get("streams", [])
+
+    audio = []
+    subs  = []
+    for s in streams:
+        codec_type = s.get("codec_type", "")
+        tags = s.get("tags", {})
+        codec_name = s.get("codec_name", "")
+        label = tags.get("title") or ""
+        lang  = tags.get("language", "")
+        idx   = s.get("index", 0)
+        disp  = s.get("disposition", {})
+
+        # Resolve a human-readable label
+        if not label:
+            if lang:
+                label = f"{lang.upper()} ({codec_name})"
+            else:
+                label = codec_name or f"Track {idx}"
+
+        if codec_type == "audio":
+            audio.append({
+                "index": idx,
+                "label": label,
+                "language": lang,
+                "codec": codec_name,
+                "channels": s.get("channels"),
+                "sample_rate": s.get("sample_rate"),
+                "default": bool(disp.get("default")),
+                "forced": bool(disp.get("forced")),
+            })
+        elif codec_type == "subtitle":
+            subs.append({
+                "index": idx,
+                "label": label,
+                "language": lang,
+                "codec": codec_name,
+                "default": bool(disp.get("default")),
+                "forced": bool(disp.get("forced")),
+            })
+
+    return {"audio": audio, "subtitles": subs, "error": None}
+
+
 @routes.get("/api/tracks/{message_id}")
 async def tracks_handler(request):
-    """Extract audio and subtitle track info using ffprobe on just the first few MB of the stream."""
-    import asyncio, subprocess, json as _json, urllib.parse as _up, shutil
+    """Extract audio and subtitle track info using ffprobe on the download stream.
+    
+    Returns JSON with audio[] and subtitles[]. Each track has:
+      - index: stream index for ffmpeg -map
+      - label: human-readable name
+      - language: ISO 639 language code (if present)
+      - codec: codec name (e.g. aac, mp3, eac3, srt, ass)
+      - default: boolean, whether this is the default track
+      - forced: boolean, whether forced playback is flagged
+    Audio tracks additionally have:
+      - channels: number of audio channels
+      - sample_rate: audio sample rate in Hz
+    """
     try:
         message_id = int(request.match_info['message_id'])
+        data = await _get_cached_tracks(message_id)
+        return web.json_response(data)
+    except (ValueError, TypeError):
+        return web.json_response({"audio": [], "subtitles": [], "error": "invalid message_id"})
+    except Exception as e:
+        import traceback
+        return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
-        # Check if ffprobe is available at all
-        if not shutil.which("ffprobe"):
-            return web.json_response({"audio": [], "subtitles": [], "error": "ffprobe not available"})
 
-        stream_url = _up.urljoin(URL, f"download/{message_id}")
+@routes.get("/api/subtitle/{message_id}/{sub_index}")
+async def subtitle_download_handler(request):
+    """Download an individual subtitle track as a standalone file (SRT/ASS/VTT).
+    
+    This endpoint extracts a specific subtitle stream from the video using ffmpeg
+    and returns it as a downloadable subtitle file, which can be used by the 
+    Plyr.js captions system or external players.
+    """
+    import shutil as _sh, subprocess as _sp, asyncio as _asyncio
+    try:
+        message_id = int(request.match_info['message_id'])
+        sub_idx = int(request.match_info['sub_index'])
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid parameters"}, status=400)
 
-        # Use -probesize and -analyzeduration to limit how much data ffprobe reads
-        proc = await asyncio.create_subprocess_exec(
-            "ffprobe",
-            "-v", "quiet",
-            "-print_format", "json",
-            "-show_streams",
-            "-probesize", "5000000",       # only read first 5 MB
-            "-analyzeduration", "500000",  # 0.5 second analysis
-            stream_url,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-        except asyncio.TimeoutError:
-            proc.kill()
-            return web.json_response({"audio": [], "subtitles": [], "error": "ffprobe timeout"})
+    if not _sh.which('ffmpeg'):
+        return web.json_response({"error": "ffmpeg not available"}, status=503)
 
-        data = _json.loads(stdout.decode()) if stdout else {}
-        streams = data.get("streams", [])
+    # Get track metadata to determine format
+    tracks = await _probe_tracks(message_id)
+    sub_track = None
+    for s in tracks.get("subtitles", []):
+        if s["index"] == sub_idx:
+            sub_track = s
+            break
+    if not sub_track:
+        return web.json_response({"error": "subtitle track not found"}, status=404)
 
-        audio = []
-        subs  = []
-        for i, s in enumerate(streams):
-            codec_type = s.get("codec_type", "")
-            tags = s.get("tags", {})
-            label = tags.get("title") or tags.get("language") or s.get("codec_name", "")
-            lang  = tags.get("language", "")
-            idx   = s.get("index", i)
-            if codec_type == "audio":
-                audio.append({"index": idx, "label": label or f"Audio {len(audio)+1}", "language": lang})
-            elif codec_type == "subtitle":
-                subs.append({"index": idx, "label": label or f"Sub {len(subs)+1}", "language": lang})
+    codec = sub_track.get("codec", "subrip")
+    # Map codec to file extension and ffmpeg subtitle codec
+    sub_ext_map = {
+        "subrip": "srt",
+        "srt": "srt",
+        "ass": "ass",
+        "ssa": "ass",
+        "webvtt": "vtt",
+        "vtt": "vtt",
+        "mov_text": "srt",
+        "dvd_subtitle": "vobsub",
+        "dvdsub": "vobsub",
+        "hdmv_pgs_subtitle": "sup",
+        "pgs": "sup",
+    }
+    sub_ext = sub_ext_map.get(codec, "srt")
+    # If the codec needs conversion, map to VTT for browser compatibility or SRT
+    sub_codec = "srt"  # ffmpeg sub-codec for SRT
+    if sub_ext == "vtt":
+        sub_codec = "webvtt"
+    elif sub_ext == "ass":
+        sub_codec = "ass"
+    else:
+        sub_codec = "srt"
 
-        return web.json_response({"audio": audio, "subtitles": subs})
+    # Build localhost URL to avoid recursion
+    stream_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
+
+    # Determine the output format for ffmpeg
+    if sub_codec == "webvtt":
+        out_format = "webvtt"
+    elif sub_codec == "ass":
+        out_format = "ass"
+    else:
+        out_format = "srt"
+
+    cmd = [
+        _sh.which('ffmpeg'),
+        '-loglevel', 'quiet',
+        '-i', stream_url,
+        '-map', f'0:s:{sub_idx}',
+        '-c:s', sub_codec,
+        '-f', out_format,
+        'pipe:1'
+    ]
+
+    # Language label for filename
+    lang_label = sub_track.get("language") or sub_track.get("label", "subtitle")
+    file_label = re.sub(r'[^a-zA-Z0-9]+', '_', lang_label).lower()
+    filename = f"subtitle_{file_label}.{sub_ext}"
+
+    proc = await _asyncio.create_subprocess_exec(
+        *cmd, stdout=_sp.PIPE, stderr=_sp.DEVNULL
+    )
+    stdout, _ = await proc.communicate()
+
+    if not stdout:
+        return web.json_response({"error": "subtitle extraction produced no output"}, status=500)
+
+    content_type_map = {
+        "srt": "text/plain; charset=utf-8",
+        "ass": "text/plain; charset=utf-8",
+        "vtt": "text/vtt; charset=utf-8",
+    }
+    content_type = content_type_map.get(sub_ext, "text/plain; charset=utf-8")
+
+    return web.Response(
+        body=stdout.decode('utf-8', errors='replace'),
+        content_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "public, max-age=3600",
+        }
+    )
+
+
+@routes.get("/api/tracks/{message_id}/force")
+async def tracks_force_handler(request):
+    """Force re-probe tracks, bypassing cache."""
+    try:
+        message_id = int(request.match_info['message_id'])
+        # Remove cache entry
+        _TRACK_CACHE.pop(message_id, None)
+        data = await _get_cached_tracks(message_id)
+        return web.json_response(data)
+    except (ValueError, TypeError):
+        return web.json_response({"audio": [], "subtitles": [], "error": "invalid message_id"})
     except Exception as e:
         return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
@@ -1290,9 +1477,9 @@ async def media_download(request, message_id: int):
 
     ffmpeg_bin = _shutil.which('ffmpeg')
     if ffmpeg_bin and (audio_idx is not None or sub_idx is not None):
-        # Build a streaming URL for ffmpeg to read from (our own /download/ endpoint
-        # without query params to avoid recursion)
-        stream_url = urllib.parse.urljoin(URL, f'download/{message_id}')
+        # Build a streaming URL for ffmpeg to read from — use localhost to avoid
+        # external networking issues and prevent recursion loops
+        stream_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
 
         cmd = [
             ffmpeg_bin,
