@@ -3,7 +3,7 @@ import secrets
 import mimetypes
 import urllib.parse
 import html
-from info import BIN_CHANNEL, URL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY, PORT
+from info import BIN_CHANNEL, URL, MAX_BTN, PREMIUM_PLANS, PAYMENT_QR_CODE, PAYMENT_ID, PAYMENT_TYPE, OWNER_USERNAME, TMDB_API_KEY
 try:
     from info import OMDB_API_KEY
 except ImportError:
@@ -18,27 +18,6 @@ from web.utils.custom_dl import TGCustomYield, chunk_size, offset_fix
 from web.utils.render_template import media_watch, error_tmplt, watch_tmplt, webapp_template, payment_template, no_tmdb_template
 from database.ia_filterdb import get_search_results
 from database.users_chats_db import db
-
-# Cache for BIN_CHANNEL messages to avoid repeated get_messages() calls on every range request
-import time as _time
-_MSG_CACHE = {}          # {message_id: (media_msg, timestamp)}
-_MSG_CACHE_TTL = 300     # seconds — 5 minutes
-
-async def _get_cached_message(message_id: int):
-    """Return cached message or fetch from Telegram and cache it."""
-    entry = _MSG_CACHE.get(message_id)
-    if entry:
-        msg, ts = entry
-        if _time.monotonic() - ts < _MSG_CACHE_TTL:
-            return msg
-    msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
-    if msg and msg.media:
-        _MSG_CACHE[message_id] = (msg, _time.monotonic())
-        # Keep cache small — evict oldest entries over 200
-        if len(_MSG_CACHE) > 200:
-            oldest = min(_MSG_CACHE, key=lambda k: _MSG_CACHE[k][1])
-            del _MSG_CACHE[oldest]
-    return msg
 import json, io, aiohttp
 import re
 import PTN
@@ -418,40 +397,71 @@ async def watch_handler(request):
     try:
         message_id = int(message_id_str)
     except (ValueError, TypeError):
-        return web.Response(body=error_tmplt.encode('utf-8'), content_type='text/html', charset='utf-8')
-    try:
-        page_html = await media_watch(message_id)
-        return web.Response(
-            body=page_html.encode('utf-8'),
-            content_type='text/html',
-            charset='utf-8'
-        )
-    except Exception as e:
-        logger.error(f"[watch] media_watch threw for id={message_id}: {e}\n{_tb.format_exc()}")
-        return web.Response(body=error_tmplt.encode('utf-8'), content_type='text/html', charset='utf-8')
+        return web.Response(text=error_tmplt, content_type='text/html')
 
-
-@routes.get("/api/watch-test/{message_id}")
-async def watch_test_handler(request):
-    """Simulates watch_handler exactly and returns JSON with result or traceback."""
-    import traceback as _tb2
-    message_id = int(request.match_info['message_id'])
+    # ── Step 1: fetch message ──────────────────────────────────────────────
     try:
-        page_html = await media_watch(message_id)
-        encoded = page_html.encode('utf-8')
-        return web.json_response({
-            "ok": True,
-            "html_len": len(page_html),
-            "encoded_len": len(encoded),
-            "title_snippet": page_html[page_html.find('<title>'):page_html.find('</title>')+8]
-        })
+        media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
     except Exception as e:
-        return web.json_response({
-            "ok": False,
-            "error": str(e),
-            "type": type(e).__name__,
-            "traceback": _tb2.format_exc()
-        })
+        logger.error(f"[watch] get_messages failed id={message_id}: {e}\n{_tb.format_exc()}")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    if not media_msg or not media_msg.media:
+        logger.warning(f"[watch] id={message_id} empty message or no media")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 2: extract media object ──────────────────────────────────────
+    try:
+        media = getattr(media_msg, media_msg.media.value, None)
+    except Exception as e:
+        logger.error(f"[watch] getattr media failed id={message_id}: {e}")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    if not media:
+        logger.warning(f"[watch] id={message_id} media object is None")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 3: video check ───────────────────────────────────────────────
+    mime      = (getattr(media, 'mime_type', '') or '').strip()
+    file_name = getattr(media, 'file_name', None) or f'video_{message_id}.mp4'
+    tag       = mime.split('/')[0].lower()
+    ext       = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
+    VIDEO_EXTS = {'mp4','mkv','avi','mov','wmv','flv','webm','m4v','ts','mpeg','mpg','3gp','ogv'}
+    is_video  = tag == 'video' or mime == 'application/octet-stream' or ext in VIDEO_EXTS
+
+    if not is_video:
+        logger.warning(f"[watch] id={message_id} not video: mime='{mime}' ext='{ext}'")
+        return web.Response(text=error_tmplt, content_type='text/html')
+
+    # ── Step 4: build the watch page HTML ────────────────────────────────
+    try:
+        src           = urllib.parse.urljoin(URL, f'download/{message_id}')
+        file_name_safe = html.escape(file_name)
+        heading        = html.escape(f'Watch \u2014 {file_name}')
+        # Resolve the real MIME type (Telegram often sends octet-stream for MKV/AVI)
+        if mime and mime != 'application/octet-stream':
+            resolved_mime = mime
+        else:
+            mime_map = {
+                'mkv': 'video/x-matroska', 'avi': 'video/x-msvideo',
+                'mov': 'video/quicktime',  'wmv': 'video/x-ms-wmv',
+                'flv': 'video/x-flv',     'webm': 'video/webm',
+                'm4v': 'video/x-m4v',     'ts': 'video/mp2t',
+                'mpeg': 'video/mpeg',      'mpg': 'video/mpeg',
+                '3gp': 'video/3gpp',       'ogv': 'video/ogg',
+                'mp4': 'video/mp4',
+            }
+            resolved_mime = mimetypes.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
+        page_html = (watch_tmplt
+                     .replace('{heading}',    heading)
+                     .replace('{file_name}',  file_name_safe)
+                     .replace('{message_id}', str(message_id))
+                     .replace('{mime_type}',  resolved_mime)
+                     .replace('{src}',        src))
+        return web.Response(text=page_html, content_type='text/html')
+    except Exception as e:
+        logger.error(f"[watch] template render failed id={message_id}: {e}\n{_tb.format_exc()}")
+        return web.Response(text=error_tmplt, content_type='text/html')
 
 @routes.get("/download/{message_id}")
 async def download_handler(request):
@@ -470,7 +480,7 @@ async def download_handler(request):
 
 @routes.get("/api/stream-file/{file_id}")
 async def stream_file_handler(request):
-    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}?fid={file_id}"""
+    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}"""
     try:
         file_id = request.match_info['file_id']
         try:
@@ -487,286 +497,46 @@ async def stream_file_handler(request):
                     status=410
                 )
             raise
-        # Pass original file_id as query param so watch/download can re-copy if message expires
-        encoded_fid = urllib.parse.quote(file_id, safe='')
-        raise web.HTTPFound(location=f"/watch/{msg.id}?fid={encoded_fid}")
+        raise web.HTTPFound(location=f"/watch/{msg.id}")
     except web.HTTPFound:
         raise
     except Exception as e:
         return web.Response(text=error_tmplt, content_type='text/html')
 
 
-# ── Track data — lazily probed and cached ────────────────────────────────
-_TRACK_CACHE = {}          # {message_id: (track_data_dict, timestamp)}
-_TRACK_CACHE_TTL = 600     # 10 minutes — tracks don't change
-
-async def _get_cached_tracks(message_id: int):
-    """Return cached track data or probe via ffprobe and cache it."""
-    entry = _TRACK_CACHE.get(message_id)
-    if entry:
-        data, ts = entry
-        if _time.monotonic() - ts < _TRACK_CACHE_TTL:
-            return data
-    # Fire probe in background — don't wait for it
-    asyncio.ensure_future(_background_track_probe(message_id))
-    return {"audio": [], "subtitles": [], "error": None}
-
-async def _background_track_probe(message_id: int):
-    """Probe tracks in background and cache them. Never blocks a request."""
-    import asyncio, subprocess, json as _json, shutil
+@routes.get("/api/tracks/{message_id}")
+async def tracks_handler(request):
+    """Use ffprobe to extract audio and subtitle track info from the stream URL."""
+    import asyncio, subprocess, json as _json, urllib.parse as _up
     try:
-        if not shutil.which("ffprobe"):
-            _TRACK_CACHE[message_id] = ({"audio": [], "subtitles": [], "error": "no ffprobe"}, _time.monotonic())
-            return
-        
-        # Probe via public download URL (works on Railway and cloud platforms)
-        stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
+        message_id = int(request.match_info['message_id'])
+        stream_url = _up.urljoin(URL, f"download/{message_id}")
+
         proc = await asyncio.create_subprocess_exec(
-            "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
-            "-probesize", "500000", "-analyzeduration", "100000",
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-select_streams", "a:s",
             stream_url,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        try:
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
-        except asyncio.TimeoutError:
-            try: proc.kill()
-            except: pass
-            # Try localhost as fallback
-            try:
-                local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
-                proc2 = await asyncio.create_subprocess_exec(
-                    "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
-                    "-probesize", "200000", "-analyzeduration", "50000",
-                    local_url,
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                )
-                stdout, _ = await asyncio.wait_for(proc2.communicate(), timeout=8)
-            except:
-                _TRACK_CACHE[message_id] = ({"audio": [], "subtitles": [], "error": "timeout"}, _time.monotonic())
-                return
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
 
         data = _json.loads(stdout.decode()) if stdout else {}
         streams = data.get("streams", [])
-        audio, subs = [], []
-        for s in streams:
-            ct = s.get("codec_type", "")
+
+        audio = []
+        subs  = []
+        for i, s in enumerate(streams):
+            codec_type = s.get("codec_type", "")
             tags = s.get("tags", {})
-            cn = s.get("codec_name", "")
-            lb = tags.get("title") or (f"{tags.get('language', '').upper()} ({cn})" if tags.get("language") else (cn or f"Track {s.get('index',0)}"))
-            lg = tags.get("language", "")
-            idx = s.get("index", 0)
-            dp = s.get("disposition", {})
-            if ct == "audio":
-                audio.append({"index": idx, "label": lb, "language": lg, "codec": cn,
-                    "channels": s.get("channels"), "sample_rate": s.get("sample_rate"),
-                    "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
-            elif ct == "subtitle":
-                subs.append({"index": idx, "label": lb, "language": lg, "codec": cn,
-                    "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
-        _TRACK_CACHE[message_id] = ({"audio": audio, "subtitles": subs, "error": None}, _time.monotonic())
-        if len(_TRACK_CACHE) > 200:
-            oldest = min(_TRACK_CACHE, key=lambda k: _TRACK_CACHE[k][1])
-            del _TRACK_CACHE[oldest]
-    except Exception:
-        pass  # background probe failure is non-fatal
+            label = tags.get("title") or tags.get("language") or s.get("codec_name", "")
+            lang  = tags.get("language", "")
+            idx   = s.get("index", i)
+            if codec_type == "audio":
+                audio.append({"index": idx, "label": label or f"Audio {len(audio)+1}", "language": lang})
+            elif codec_type == "subtitle":
+                subs.append({"index": idx, "label": label or f"Sub {len(subs)+1}", "language": lang})
 
-
-async def _probe_sync(message_id: int):
-    """Synchronous probe — used when subtitle download needs track data.
-    Waits for and returns track data, unlike background probe which fires and forgets."""
-    import subprocess, json as _json, shutil
-    if not shutil.which("ffprobe"):
-        return {"audio": [], "subtitles": [], "error": "no ffprobe"}
-    
-    # Try public URL first
-    stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
-    proc = await asyncio.create_subprocess_exec(
-        "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
-        "-probesize", "500000", "-analyzeduration", "100000",
-        stream_url,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
-    except asyncio.TimeoutError:
-        try: proc.kill()
-        except: pass
-        try:
-            local_url = f"http://127.0.0.1:{PORT}/download/{message_id}"
-            proc2 = await asyncio.create_subprocess_exec(
-                "ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams",
-                "-probesize", "200000", "-analyzeduration", "50000",
-                local_url,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            stdout, _ = await asyncio.wait_for(proc2.communicate(), timeout=8)
-        except:
-            return {"audio": [], "subtitles": [], "error": "timeout"}
-
-    data = _json.loads(stdout.decode()) if stdout else {}
-    streams = data.get("streams", [])
-    audio, subs = [], []
-    for s in streams:
-        ct = s.get("codec_type", "")
-        tags = s.get("tags", {})
-        cn = s.get("codec_name", "")
-        lb = tags.get("title") or (f"{tags.get('language', '').upper()} ({cn})" if tags.get("language") else (cn or f"Track {s.get('index',0)}"))
-        lg = tags.get("language", "")
-        idx = s.get("index", 0)
-        dp = s.get("disposition", {})
-        if ct == "audio":
-            audio.append({"index": idx, "label": lb, "language": lg, "codec": cn,
-                "channels": s.get("channels"), "sample_rate": s.get("sample_rate"),
-                "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
-        elif ct == "subtitle":
-            subs.append({"index": idx, "label": lb, "language": lg, "codec": cn,
-                "default": bool(dp.get("default")), "forced": bool(dp.get("forced"))})
-    result = {"audio": audio, "subtitles": subs, "error": None}
-    # Also cache it
-    _TRACK_CACHE[message_id] = (result, _time.monotonic())
-    return result
-
-
-@routes.get("/api/tracks/{message_id}")
-async def tracks_handler(request):
-    """Extract audio and subtitle track info using ffprobe.
-    
-    Returns immediately with cached data (or empty array if not yet probed).
-    Probing happens in the background — first request gets empty tracks,
-    subsequent requests (or page refresh) get the probed data.
-    
-    Track fields: index, label, language, codec, default, forced.
-    Audio additionally: channels, sample_rate.
-    """
-    try:
-        message_id = int(request.match_info['message_id'])
-        data = await _get_cached_tracks(message_id)
-        return web.json_response(data)
-    except (ValueError, TypeError):
-        return web.json_response({"audio": [], "subtitles": [], "error": "invalid message_id"})
-    except Exception as e:
-        return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
-
-
-@routes.get("/api/subtitle/{message_id}/{sub_index}")
-async def subtitle_download_handler(request):
-    """Download an individual subtitle track as a standalone file (SRT/ASS/VTT).
-    
-    This endpoint extracts a specific subtitle stream from the video using ffmpeg
-    and returns it as a downloadable subtitle file, which can be used by the 
-    Plyr.js captions system or external players.
-    """
-    import shutil as _sh, subprocess as _sp, asyncio as _asyncio
-    try:
-        message_id = int(request.match_info['message_id'])
-        sub_idx = int(request.match_info['sub_index'])
-    except (ValueError, TypeError):
-        return web.json_response({"error": "invalid parameters"}, status=400)
-
-    if not _sh.which('ffmpeg'):
-        return web.json_response({"error": "ffmpeg not available"}, status=503)
-
-    # Get track metadata from cache (fire probe if needed)
-    tracks = await _get_cached_tracks(message_id)
-    if not tracks.get("subtitles"):
-        # If cache was empty, wait for probe synchronously (subtitle download is explicit action)
-        tracks = await _probe_sync(message_id)
-    sub_track = None
-    for s in tracks.get("subtitles", []):
-        if s["index"] == sub_idx:
-            sub_track = s
-            break
-    if not sub_track:
-        return web.json_response({"error": "subtitle track not found"}, status=404)
-
-    codec = sub_track.get("codec", "subrip")
-    # Map codec to file extension and ffmpeg subtitle codec
-    sub_ext_map = {
-        "subrip": "srt",
-        "srt": "srt",
-        "ass": "ass",
-        "ssa": "ass",
-        "webvtt": "vtt",
-        "vtt": "vtt",
-        "mov_text": "srt",
-        "dvd_subtitle": "vobsub",
-        "dvdsub": "vobsub",
-        "hdmv_pgs_subtitle": "sup",
-        "pgs": "sup",
-    }
-    sub_ext = sub_ext_map.get(codec, "srt")
-    # If the codec needs conversion, map to VTT for browser compatibility or SRT
-    sub_codec = "srt"  # ffmpeg sub-codec for SRT
-    if sub_ext == "vtt":
-        sub_codec = "webvtt"
-    elif sub_ext == "ass":
-        sub_codec = "ass"
-    else:
-        sub_codec = "srt"
-
-    # Build URL for ffmpeg to read from — use public URL for Railway compatibility
-    stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
-
-    # Determine the output format for ffmpeg
-    if sub_codec == "webvtt":
-        out_format = "webvtt"
-    elif sub_codec == "ass":
-        out_format = "ass"
-    else:
-        out_format = "srt"
-
-    cmd = [
-        _sh.which('ffmpeg'),
-        '-loglevel', 'quiet',
-        '-i', stream_url,
-        '-map', f'0:s:{sub_idx}',
-        '-c:s', sub_codec,
-        '-f', out_format,
-        'pipe:1'
-    ]
-
-    # Language label for filename
-    lang_label = sub_track.get("language") or sub_track.get("label", "subtitle")
-    file_label = re.sub(r'[^a-zA-Z0-9]+', '_', lang_label).lower()
-    filename = f"subtitle_{file_label}.{sub_ext}"
-
-    proc = await _asyncio.create_subprocess_exec(
-        *cmd, stdout=_sp.PIPE, stderr=_sp.DEVNULL
-    )
-    stdout, _ = await proc.communicate()
-
-    if not stdout:
-        return web.json_response({"error": "subtitle extraction produced no output"}, status=500)
-
-    content_type_map = {
-        "srt": "text/plain; charset=utf-8",
-        "ass": "text/plain; charset=utf-8",
-        "vtt": "text/vtt; charset=utf-8",
-    }
-    content_type = content_type_map.get(sub_ext, "text/plain; charset=utf-8")
-
-    return web.Response(
-        body=stdout.decode('utf-8', errors='replace'),
-        content_type=content_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "public, max-age=3600",
-        }
-    )
-
-
-@routes.get("/api/tracks/{message_id}/force")
-async def tracks_force_handler(request):
-    """Force re-probe tracks, bypassing cache."""
-    try:
-        message_id = int(request.match_info['message_id'])
-        # Remove cache entry
-        _TRACK_CACHE.pop(message_id, None)
-        data = await _get_cached_tracks(message_id)
-        return web.json_response(data)
-    except (ValueError, TypeError):
-        return web.json_response({"audio": [], "subtitles": [], "error": "invalid message_id"})
+        return web.json_response({"audio": audio, "subtitles": subs})
     except Exception as e:
         return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
@@ -1020,7 +790,6 @@ async def debug_watch_handler(request):
         result["steps"].append("get_messages: ok")
         result["msg_id_returned"] = getattr(media_msg, "id", None)
         result["msg_empty"] = media_msg is None
-        result["pyrogram_empty"] = getattr(media_msg, "empty", None)
         if not media_msg or not media_msg.media:
             result["steps"].append("FAIL: message missing or no media")
             result["media_value"] = None
@@ -1063,83 +832,6 @@ async def debug_watch_handler(request):
         result["steps"].append(f"EXCEPTION: {e}")
         result["traceback"] = traceback.format_exc()
     return web.json_response(result)
-
-
-@routes.get("/api/debug-stream")
-async def debug_stream_handler(request):
-    """Tests the full send_cached_media → watch flow using the first file in the DB."""
-    import traceback as _tb
-    result = {"steps": [], "bin_channel": BIN_CHANNEL}
-    try:
-        from database.ia_filterdb import collection, second_collection, SECOND_FILES_DATABASE_URL
-        doc = await collection.find_one({})
-        if not doc and SECOND_FILES_DATABASE_URL and second_collection:
-            doc = await second_collection.find_one({})
-        if not doc:
-            result["steps"].append("FAIL: no files found in database")
-            return web.json_response(result)
-        file_id = doc["_id"]
-        result["db_file_id"] = file_id
-        result["db_file_name"] = doc.get("file_name", "unknown")
-        result["steps"].append(f"found file in db: {doc.get('file_name','?')}")
-
-        # Try send_cached_media
-        try:
-            msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
-            result["send_cached_media"] = "ok"
-            result["new_msg_id"] = msg.id
-            result["steps"].append(f"send_cached_media ok, msg_id={msg.id}")
-        except Exception as e:
-            result["send_cached_media"] = f"FAILED: {e}"
-            result["send_cached_media_traceback"] = _tb.format_exc()
-            result["steps"].append(f"send_cached_media FAILED: {e}")
-            return web.json_response(result)
-
-        # Try get_messages on the new message
-        try:
-            media_msg = await temp.BOT.get_messages(BIN_CHANNEL, msg.id)
-            result["get_messages"] = "ok"
-            result["msg_id_returned"] = getattr(media_msg, "id", None)
-            result["msg_has_media"] = media_msg.media is not None
-            result["media_type"] = str(media_msg.media) if media_msg.media else None
-            result["steps"].append(f"get_messages ok, has_media={media_msg.media is not None}")
-            if media_msg.media:
-                media = getattr(media_msg, media_msg.media.value, None)
-                result["media_obj"] = media is not None
-                if media:
-                    result["mime_type"] = getattr(media, "mime_type", None)
-                    result["file_name"] = getattr(media, "file_name", None)
-                    result["file_size"] = getattr(media, "file_size", None)
-        except Exception as e:
-            result["get_messages"] = f"FAILED: {e}"
-            result["steps"].append(f"get_messages FAILED: {e}")
-
-        result["watch_url"] = f"/watch/{msg.id}"
-        result["download_url"] = f"/download/{msg.id}"
-    except Exception as e:
-        result["steps"].append(f"EXCEPTION: {e}")
-        result["traceback"] = _tb.format_exc()
-    return web.json_response(result)
-
-
-@routes.get("/api/debug-watch-trace/{message_id}")
-async def debug_watch_trace_handler(request):
-    """Returns the full exception traceback if media_watch throws."""
-    import traceback as _tb2
-    message_id = int(request.match_info['message_id'])
-    try:
-        html_out = await media_watch(message_id)
-        return web.json_response({
-            "ok": True,
-            "length": len(html_out),
-            "preview": html_out[:200]
-        })
-    except Exception as e:
-        return web.json_response({
-            "ok": False,
-            "error": str(e),
-            "traceback": _tb2.format_exc()
-        })
 
 
 @routes.get("/api/repair-status")
@@ -1343,10 +1035,7 @@ async def recently_added_handler(request):
                 "overview": meta.get("overview", ""),
             })
 
-        return web.json_response({"files": enriched}, headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-        })
+        return web.json_response({"files": enriched})
     except Exception as e:
         return web.json_response({"files": [], "error": str(e)}, status=500)
 
@@ -1476,11 +1165,94 @@ async def today_airing_handler(request):
         return web.json_response({"error": str(e)}, status=500)
 
 
-async def media_download(request, message_id: int):
-    import shutil as _shutil, subprocess as _sp, asyncio as _asyncio
+@routes.get("/api/mm-trending")
+async def mm_trending_handler(request):
+    """Returns MultiMoviesAPI trending/featured items for the web UI,
+    formatted the same way as /api/tmdb-trending rows."""
+    from multimovies_api import get_trending, get_popular, get_featured, get_recently_added
 
+    def _fmt(item):
+        slug = item.get("slug", "")
+        title = item.get("title") or item.get("name") or ""
+        type_ = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
+        year = str(item.get("year") or item.get("release_year") or "")
+        poster = item.get("poster") or item.get("thumbnail") or item.get("image") or None
+        rating = float(item.get("rating") or item.get("imdb_rating") or 0) or 0
+        overview = item.get("overview") or item.get("description") or ""
+        from multimovies_api import build_player_url
+        return {
+            "slug": slug,
+            "title": title,
+            "type": type_,
+            "year": year,
+            "poster": poster,
+            "backdrop": poster,
+            "rating": round(rating, 1),
+            "overview": overview[:200],
+            "player_url": build_player_url(slug, type_, title),
+            "source": "multimovies",
+            "id": slug,
+        }
+
+    try:
+        trending_movies, trending_tv, featured, new_movies, new_tv = await asyncio.gather(
+            get_trending("movie"),
+            get_trending("tv"),
+            get_featured(),
+            get_recently_added("movie"),
+            get_recently_added("tv"),
+        )
+        all_trending = [_fmt(i) for i in (trending_movies or [])[:20]]
+        all_trending_tv = [_fmt(i) for i in (trending_tv or [])[:20]]
+        all_featured = [_fmt(i) for i in (featured or [])[:20]]
+        all_new = [_fmt(i) for i in (new_movies or [])[:20]]
+        all_new_tv = [_fmt(i) for i in (new_tv or [])[:20]]
+        return web.json_response({
+            "trending_movies": all_trending,
+            "trending_tv": all_trending_tv,
+            "featured": all_featured,
+            "new_movies": all_new,
+            "new_tv": all_new_tv,
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+@routes.get("/api/mm-player")
+async def mm_player_handler(request):
+    """Searches MultiMoviesAPI for a title and returns its player URL."""
+    from multimovies_api import find_best_match, build_player_url
+    title = request.query.get("title", "").strip()
+    type_ = request.query.get("type", "movie").strip()
+    season = request.query.get("season")
+    episode = request.query.get("episode")
+    if not title:
+        return web.json_response({"error": "Missing title"}, status=400)
+    try:
+        item = await find_best_match(title)
+        if not item:
+            return web.json_response({"player_url": None, "found": False})
+        slug = item.get("slug", "")
+        matched_type = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
+        player_url = build_player_url(
+            slug, matched_type, title,
+            season=int(season) if season else None,
+            episode=int(episode) if episode else None,
+        )
+        return web.json_response({
+            "found": True,
+            "player_url": player_url,
+            "slug": slug,
+            "title": item.get("title") or item.get("name") or title,
+            "type": matched_type,
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+
+async def media_download(request, message_id: int):
     range_header = request.headers.get('Range', '')
-    media_msg = await _get_cached_message(message_id)
+    media_msg = await temp.BOT.get_messages(BIN_CHANNEL, message_id)
 
     # Guard: message must exist and carry media
     if not media_msg or not media_msg.media:
@@ -1490,10 +1262,33 @@ async def media_download(request, message_id: int):
     if not media:
         raise web.HTTPNotFound(text=error_tmplt, content_type='text/html')
 
+    file_size = media.file_size
+
+    if range_header:
+        from_bytes, until_bytes = range_header.replace('bytes=', '').split('-')
+        from_bytes = int(from_bytes)
+        until_bytes = int(until_bytes) if until_bytes else file_size - 1
+    else:
+        from_bytes = 0
+        until_bytes = file_size - 1
+
+    # Clamp to valid range
+    from_bytes = max(0, min(from_bytes, file_size - 1))
+    until_bytes = max(from_bytes, min(until_bytes, file_size - 1))
+    req_length = until_bytes - from_bytes + 1
+
+    new_chunk_size = await chunk_size(req_length)
+    offset = await offset_fix(from_bytes, new_chunk_size)
+    first_part_cut = from_bytes - offset
+    last_part_cut = (until_bytes % new_chunk_size) + 1
+    part_count = math.ceil(req_length / new_chunk_size)
+    body = TGCustomYield().yield_file(media_msg, offset, first_part_cut, last_part_cut, part_count,
+                                      new_chunk_size)
+
     file_name = media.file_name if media.file_name \
         else f"{secrets.token_hex(2)}.mp4"
 
-    # Resolve mime
+    # Resolve mime — Telegram often sends MKV/AVI as application/octet-stream
     mime_type = media.mime_type if (media.mime_type and media.mime_type != 'application/octet-stream') \
         else mimetypes.guess_type(file_name)[0]
     if not mime_type:
@@ -1508,85 +1303,7 @@ async def media_download(request, message_id: int):
         }
         mime_type = mime_map.get(ext, 'video/mp4')
 
-    # ── Audio/subtitle track selection via ffmpeg (if available) ────────────
-    audio_idx = request.rel_url.query.get('audio', None)
-    sub_idx   = request.rel_url.query.get('sub',   None)
-
-    ffmpeg_bin = _shutil.which('ffmpeg')
-    if ffmpeg_bin and (audio_idx is not None or sub_idx is not None):
-        # Build a streaming URL for ffmpeg to read from
-        # Use the public URL (works on Railway and other cloud platforms)
-        stream_url = urllib.parse.urljoin(URL, f"download/{message_id}")
-
-        cmd = [
-            ffmpeg_bin,
-            '-loglevel', 'quiet',
-            '-i', stream_url,
-            '-map', '0:v:0',                         # always keep first video
-            '-map', f'0:a:{audio_idx or 0}',          # selected audio track
-        ]
-        if sub_idx is not None and sub_idx != 'off':
-            cmd += ['-map', f'0:s:{sub_idx}']
-
-        cmd += [
-            '-c', 'copy',         # no re-encoding — just remux
-            '-movflags', 'frag_keyframe+empty_moov+faststart',
-            '-f', 'mp4',          # output as fragmented MP4 (browser-compatible)
-            'pipe:1'
-        ]
-
-        async def ffmpeg_stream():
-            proc = await _asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=_sp.PIPE, stderr=_sp.DEVNULL
-            )
-            try:
-                while True:
-                    chunk = await proc.stdout.read(65536)
-                    if not chunk:
-                        break
-                    yield chunk
-            finally:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-
-        return web.Response(
-            status=200,
-            body=ffmpeg_stream(),
-            headers={
-                'Content-Type': 'video/mp4',
-                'Content-Disposition': f'inline; filename="{file_name}"',
-                'Cache-Control': 'no-cache',
-                'X-Track-Audio': str(audio_idx),
-            }
-        )
-
-    # ── Default: direct Telegram stream (no ffmpeg / no track param) ────────
-    file_size = media.file_size
-
-    if range_header:
-        from_bytes, until_bytes = range_header.replace('bytes=', '').split('-')
-        from_bytes = int(from_bytes)
-        until_bytes = int(until_bytes) if until_bytes else file_size - 1
-    else:
-        from_bytes = 0
-        until_bytes = file_size - 1
-
-    from_bytes = max(0, min(from_bytes, file_size - 1))
-    until_bytes = max(from_bytes, min(until_bytes, file_size - 1))
-    req_length  = until_bytes - from_bytes + 1
-
-    new_chunk_size  = await chunk_size(req_length)
-    offset          = await offset_fix(from_bytes, new_chunk_size)
-    first_part_cut  = from_bytes - offset
-    last_part_cut   = (until_bytes % new_chunk_size) + 1
-    part_count      = math.ceil(req_length / new_chunk_size)
-    body = TGCustomYield().yield_file(media_msg, offset, first_part_cut, last_part_cut,
-                                      part_count, new_chunk_size)
-
-    return web.Response(
+    return_resp = web.Response(
         status=206 if range_header else 200,
         body=body,
         headers={
@@ -1597,3 +1314,5 @@ async def media_download(request, message_id: int):
             "Accept-Ranges": "bytes",
         }
     )
+
+    return return_resp
