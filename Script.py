@@ -71,6 +71,13 @@ I can't find the <b>{}</b> in my database! 🥲
 I can filter movie and series you want
 Just type you want movie or series in my PM or adding me in to group
 And i have more feature for you
+
+<b>🌐 Online Streaming Commands:</b>
+/online &lt;title&gt; — Search online streaming links for any movie or show
+/trending — Browse trending movies (add <code>tv</code> for TV shows)
+/popular — Browse popular movies (add <code>tv</code> for TV shows)
+/newmovies — Browse recently added movies (add <code>tv</code> for TV shows)
+
 Just try my commands"""
 
     ADMIN_COMMAND_TXT = """<b>Here is bot admin commands 👇
