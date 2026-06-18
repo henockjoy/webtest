@@ -10,6 +10,7 @@ from info import VERIFY_TUTORIAL, IS_PREMIUM, PICS, TUTORIAL, SHORTLINK_API, SHO
 from pyrogram.types import ReplyParameters, WebAppInfo, PreCheckoutQuery, Message, LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, LinkPreviewOptions
 from pyrogram import Client, filters, enums
 from utils import get_plan_name, handle_next_back, is_premium, get_size, is_subscribed, is_check_admin, get_wish, get_shortlink, get_readable_time, get_poster, temp, get_settings, save_group_settings
+from multimovies_api import find_best_match, get_item_info
 from database.users_chats_db import db
 from database.ia_filterdb import delete_files, db_count_documents, second_db_count_documents, get_search_results
 from plugins.commands import get_grp_stg
@@ -1104,7 +1105,20 @@ async def auto_filter(client, msg, s, spoll=False):
         [InlineKeyboardButton('🤑 Buy Premium', url=f"https://t.me/{temp.U_NAME}?start=premium")]
     )
 
-    imdb = await get_poster(search, file=(files[0])['file_name']) if settings["imdb"] else None
+    async def _noop():
+        return None
+
+    imdb, mm_match = await asyncio.gather(
+        get_poster(search, file=(files[0])['file_name']) if settings["imdb"] else _noop(),
+        find_best_match(search)
+    )
+
+    if mm_match:
+        mm_info = get_item_info(mm_match)
+        if mm_info.get("player_url"):
+            btn.insert(-1, [
+                InlineKeyboardButton("🌐 Watch Online", url=mm_info["player_url"])
+            ])
     TEMPLATE = settings['template']
     if imdb:
         cap = TEMPLATE.format(
@@ -1204,4 +1218,3 @@ async def advantage_spell_chok(message, s):
         await message.delete()
     except:
         pass
-
