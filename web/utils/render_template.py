@@ -2217,8 +2217,15 @@ function selectFile(file, el) {
     document.querySelectorAll('.file-item.selected').forEach(x => x.classList.remove('selected'));
     el.classList.add('selected');
     document.getElementById('selectedFileName').textContent = `${file.name} (${file.size})`;
-    const playerUrl = makePlayerUrl(currentItem, file);
-    document.getElementById('watchAction').href = playerUrl;
+    // Build internal stream URL with episode metadata for the watch page
+    const title   = (currentItem && currentItem.title) || '';
+    const type    = (currentItem && currentItem.type)  || 'movie';
+    const season  = (file.season  != null) ? file.season  : '';
+    const episode = (file.episode != null) ? file.episode : '';
+    const params  = new URLSearchParams({ title, type });
+    if (season  !== '') params.set('season',  season);
+    if (episode !== '') params.set('episode', episode);
+    document.getElementById('watchAction').href = `/api/stream-file/${file.id}?${params.toString()}`;
     document.getElementById('downloadAction').onclick = () => getFile(file.id);
     document.getElementById('fileActionBar').classList.add('show');
     showToast('File selected — click Watch Online to stream');
@@ -2493,6 +2500,33 @@ watch_tmplt = """<!DOCTYPE html>
         footer{padding:.8rem 1.5rem;text-align:center;color:var(--txt2);font-size:.72rem;margin-top:auto}
         .ha-link{color:var(--accent);text-decoration:none;font-weight:600}
 
+        /* ── Episode / Season panel ── */
+        .ep-section{width:100%;margin-top:.9rem}
+        .ep-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem}
+        .ep-title-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2)}
+        .ep-toggle-btn{background:none;border:1px solid var(--border);color:var(--txt2);border-radius:7px;padding:.28rem .65rem;font-size:.7rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:background .15s,color .15s}
+        .ep-toggle-btn:hover{background:var(--card2);color:#fff}
+        .s-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.55rem}
+        .s-tab{padding:.38rem .82rem;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--txt2);font-size:.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:background .15s,color .15s,border-color .15s}
+        .s-tab:hover{background:var(--card2);color:#fff}
+        .s-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        .ep-list{display:flex;flex-direction:column;gap:.3rem;max-height:300px;overflow-y:auto;padding-right:.15rem}
+        .ep-list::-webkit-scrollbar{width:3px}
+        .ep-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+        .ep-item{display:flex;align-items:center;gap:.65rem;padding:.6rem .75rem;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:background .15s,border-color .15s;user-select:none}
+        .ep-item:hover{background:var(--card2);border-color:rgba(14,165,233,.3)}
+        .ep-item.ep-active{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.45);cursor:default}
+        .ep-item.ep-loading{opacity:.55;pointer-events:none}
+        .ep-badge{flex-shrink:0;font-size:.66rem;font-weight:800;color:var(--accent);background:rgba(14,165,233,.1);padding:.22rem .48rem;border-radius:5px;min-width:42px;text-align:center;letter-spacing:.02em}
+        .ep-item.ep-active .ep-badge{background:rgba(14,165,233,.22)}
+        .ep-info{flex:1;min-width:0}
+        .ep-name{font-size:.76rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ep-meta{font-size:.66rem;color:var(--txt2);margin-top:.12rem}
+        .ep-icon{flex-shrink:0;color:var(--accent)}
+        .ep-msg{padding:1.2rem;text-align:center;font-size:.78rem}
+        .ep-msg.ep-err{color:#f87171}
+        .ep-msg.ep-info{color:var(--txt2)}
+
         @media(max-width:600px){
             .container{padding:1rem .75rem 2rem}
             .track-row,.seek-row{grid-template-columns:1fr 1fr}
@@ -2556,6 +2590,20 @@ watch_tmplt = """<!DOCTYPE html>
                 <select class="track-select" id="subSelect">
                     <option value="off">Off</option>
                 </select>
+            </div>
+        </div>
+
+        <!-- Season / Episode panel (shown for TV & anime) -->
+        <div class="ep-section" id="epSection" style="display:none">
+            <div class="ep-header">
+                <span class="ep-title-label" id="epTitleLabel">Episodes</span>
+                <button class="ep-toggle-btn" id="epToggleBtn" onclick="epToggle()">Hide</button>
+            </div>
+            <div id="epBody">
+                <div class="s-tabs" id="sTabs"></div>
+                <div class="ep-list" id="epList">
+                    <div class="ep-msg ep-info">Loading episodes...</div>
+                </div>
             </div>
         </div>
 
@@ -2722,6 +2770,172 @@ watch_tmplt = """<!DOCTYPE html>
             showErr();
         }
     }, 25000);
+})();
+
+/* ── Episode / Season panel ─────────────────────────────────────────────── */
+(function() {
+    var SHOW_TITLE  = "{show_title}";   // URL-encoded show title
+    var MEDIA_TYPE  = "{media_type}";   // tv / anime / movie
+    var CUR_SEASON  = {cur_season};     // integer (0 = unknown)
+    var CUR_EPISODE = {cur_episode};    // integer (0 = unknown)
+    var CUR_FILE_ID = "{cur_file_id}";  // URL-encoded file_id of current episode
+
+    if (MEDIA_TYPE !== "tv" && MEDIA_TYPE !== "anime") return;
+    if (!SHOW_TITLE) return;
+
+    var _epFiles = [], _epSeasonMap = {}, _epActiveSeason = 0, _epVisible = true;
+
+    document.getElementById("epSection").style.display = "";
+
+    window.epToggle = function() {
+        _epVisible = !_epVisible;
+        document.getElementById("epBody").style.display = _epVisible ? "" : "none";
+        document.getElementById("epToggleBtn").textContent = _epVisible ? "Hide" : "Show";
+    };
+
+    function escH(s) {
+        return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function fetchPage(url, acc, done, fail) {
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                acc = acc.concat(d.files || []);
+                if (d.next_offset && acc.length < 300) {
+                    var next = "/api/search?q=" + SHOW_TITLE + "&type=" + encodeURIComponent(MEDIA_TYPE) + "&offset=" + d.next_offset;
+                    fetchPage(next, acc, done, fail);
+                } else {
+                    done(acc);
+                }
+            })
+            .catch(function() {
+                if (acc.length > 0) done(acc); else fail();
+            });
+    }
+
+    fetchPage(
+        "/api/search?q=" + SHOW_TITLE + "&type=" + encodeURIComponent(MEDIA_TYPE) + "&offset=0",
+        [],
+        function(files) { _epFiles = files; epBuildPanel(); },
+        function() { document.getElementById("epList").innerHTML = '<div class="ep-msg ep-err">Could not load episodes.</div>'; }
+    );
+
+    function epBuildPanel() {
+        _epSeasonMap = {};
+        _epFiles.forEach(function(f) {
+            var s = (f.season != null && f.season !== undefined) ? Number(f.season) : 0;
+            if (!_epSeasonMap[s]) _epSeasonMap[s] = [];
+            _epSeasonMap[s].push(f);
+        });
+        var keys = Object.keys(_epSeasonMap).map(Number).sort(function(a,b){ return a - b; });
+        if (!keys.length) {
+            document.getElementById("epList").innerHTML = '<div class="ep-msg ep-info">No episodes found.</div>';
+            return;
+        }
+        document.getElementById("epTitleLabel").textContent = "Episodes (" + _epFiles.length + ")";
+        _epActiveSeason = (CUR_SEASON && _epSeasonMap[CUR_SEASON]) ? CUR_SEASON : keys[0];
+
+        var tabsEl = document.getElementById("sTabs");
+        tabsEl.innerHTML = "";
+        if (keys.length > 1) {
+            keys.forEach(function(s) {
+                var btn = document.createElement("button");
+                btn.className = "s-tab" + (s === _epActiveSeason ? " active" : "");
+                btn.textContent = s === 0 ? "Other" : ("S" + (s < 10 ? "0" + s : "" + s));
+                btn._s = s;
+                btn.onclick = function() { epSwitchSeason(this._s); };
+                tabsEl.appendChild(btn);
+            });
+        }
+        epRenderList(_epSeasonMap[_epActiveSeason] || []);
+    }
+
+    function epSwitchSeason(s) {
+        _epActiveSeason = s;
+        document.querySelectorAll(".s-tab").forEach(function(b) { b.classList.toggle("active", b._s === s); });
+        epRenderList(_epSeasonMap[s] || []);
+    }
+    window.epSwitchSeason = epSwitchSeason;
+
+    function epRenderList(files) {
+        var listEl = document.getElementById("epList");
+        if (!files.length) {
+            listEl.innerHTML = '<div class="ep-msg ep-info">No episodes in this season.</div>';
+            return;
+        }
+        var sorted = files.slice().sort(function(a, b) {
+            var ea = (a.episode != null) ? Number(a.episode) : 9999;
+            var eb = (b.episode != null) ? Number(b.episode) : 9999;
+            return ea - eb || String(a.name || "").localeCompare(String(b.name || ""));
+        });
+        listEl.innerHTML = "";
+        sorted.forEach(function(f) {
+            var fid = String(f.id || "");
+            var curFidDecoded = "";
+            try { curFidDecoded = decodeURIComponent(CUR_FILE_ID); } catch(e) { curFidDecoded = CUR_FILE_ID; }
+            var isActive = curFidDecoded
+                ? fid === curFidDecoded
+                : (CUR_SEASON && CUR_EPISODE && Number(f.season) === CUR_SEASON && Number(f.episode) === CUR_EPISODE);
+
+            var sn = (f.season  != null) ? Number(f.season)  : null;
+            var en = (f.episode != null) ? Number(f.episode) : null;
+            var badge = sn != null && en != null
+                ? "S" + (sn < 10 ? "0"+sn : sn) + "E" + (en < 10 ? "0"+en : en)
+                : en != null ? "Ep " + en
+                : sn != null ? "S"  + (sn < 10 ? "0"+sn : sn)
+                : "—";
+
+            var item = document.createElement("div");
+            item.className = "ep-item" + (isActive ? " ep-active" : "");
+            item.innerHTML =
+                '<span class="ep-badge">' + escH(badge) + "</span>" +
+                '<div class="ep-info">' +
+                    '<div class="ep-name">' + escH(f.name || "") + "</div>" +
+                    '<div class="ep-meta">' + escH(f.size || "") + "</div>" +
+                "</div>" +
+                (isActive
+                    ? '<svg class="ep-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>'
+                    : '<svg class="ep-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+                );
+
+            if (!isActive) {
+                (function(file, el) {
+                    el.onclick = function() { epLoad(file, el); };
+                })(f, item);
+            }
+            listEl.appendChild(item);
+        });
+
+        var activeEl = listEl.querySelector(".ep-active");
+        if (activeEl) setTimeout(function() { activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 150);
+    }
+
+    function epLoad(file, el) {
+        document.querySelectorAll(".ep-item").forEach(function(i) { i.classList.remove("ep-loading"); });
+        el.classList.add("ep-loading");
+        var s  = (file.season  != null) ? Number(file.season)  : 0;
+        var ep = (file.episode != null) ? Number(file.episode) : 0;
+        var fid = String(file.id || "");
+        var qs = "?title=" + SHOW_TITLE +
+                 "&type="  + encodeURIComponent(MEDIA_TYPE) +
+                 "&season=" + s + "&episode=" + ep +
+                 "&file_id=" + encodeURIComponent(fid);
+        fetch("/api/resolve-file/" + encodeURIComponent(fid))
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) {
+                    el.classList.remove("ep-loading");
+                    alert("Could not load episode: " + d.error);
+                    return;
+                }
+                window.location.href = "/watch/" + d.message_id + qs;
+            })
+            .catch(function() {
+                el.classList.remove("ep-loading");
+                alert("Network error. Please try again.");
+            });
+    }
 })();
 </script>
 </body>
