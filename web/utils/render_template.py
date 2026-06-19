@@ -1496,10 +1496,13 @@ async function loadHome() {
         }
 
         const populate = (rowId, items) => {
-            if (!items || !items.length) return;
             const row = document.getElementById(rowId);
             if (!row) return;
             row.innerHTML = '';
+            if (!items || !items.length) {
+                row.innerHTML = emptyMsg;
+                return;
+            }
             items.forEach(item => row.appendChild(renderMMCard(item)));
             enableDragScroll(row);
         };
@@ -1518,11 +1521,17 @@ async function loadHome() {
 
     } catch(e) {
         console.error('MM content load failed:', e);
-        document.getElementById('heroTitle').textContent = 'Could not load content';
-        document.getElementById('heroOverview').textContent = 'Check network connection.';
+        const errMsg = e.message || 'Could not reach content server.';
+        document.getElementById('heroTitle').textContent = 'Content Unavailable';
+        document.getElementById('heroOverview').textContent = errMsg;
+        document.getElementById('heroBadge') && (document.getElementById('heroBadge').textContent = '⚠️');
+        const retryHTML = `<div style="padding:20px 16px;color:var(--text3);font-size:13px;display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+            <span>${escapeHTML(errMsg)}</span>
+            <button onclick="loadHome()" style="background:var(--accent);color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">↺ Retry</button>
+        </div>`;
         ['rowMMMovies','rowMMTV','rowMMNew'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = emptyMsg;
+            if (el) el.innerHTML = retryHTML;
         });
     }
 
@@ -2637,11 +2646,24 @@ function loadContinueWatching() {
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+async function checkRepairMode() {
+    try {
+        const resp = await fetch('/api/repair-status');
+        const data = await resp.json();
+        if (data.repair_mode) {
+            document.getElementById('repairOverlay').classList.add('show');
+            return true;
+        }
+    } catch(e) {}
+    return false;
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    const inMaintenance = await checkRepairMode();
     loadWatchlist();
     _updateWlNav();
     loadContinueWatching();
-    loadHome();
+    if (!inMaintenance) loadHome();
 });
 </script>
 </body>
