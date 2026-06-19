@@ -998,6 +998,16 @@ webapp_template = """
         </div>
     </section>
 
+    <!-- ── RECENTLY VIEWED (localStorage) ── -->
+    <section class="row-section fade-up" id="recentlyViewedSection" style="display:none">
+        <div class="row-header">
+            <div class="row-title" style="display:flex;align-items:center;gap:8px">
+                <span></span>Recently Viewed
+            </div>
+        </div>
+        <div class="poster-scroll" id="rowRecentlyViewed"></div>
+    </section>
+
     <!-- Trending Row -->
     <section class="row-section fade-up">
         <div class="row-header">
@@ -1253,6 +1263,9 @@ function renderRow(containerId, items) {
 
 // ── LOAD HOME ─────────────────────────────────────────────────────────────
 async function loadHome() {
+    // 0. Show recently viewed immediately (no network needed)
+    renderRecentlyViewed();
+
     // 1. Check repair mode first
     try {
         const rs = await fetch('/api/repair-status');
@@ -1530,11 +1543,17 @@ function selectFileById(file) {
 let searchTimer = null;
 
 function openSearch() {
+    if (!document.getElementById('searchOverlay').classList.contains('open')) {
+        history.pushState({ navType: 'search' }, '');
+        _navDepth++;
+        _updateTgBackBtn();
+    }
     document.getElementById('searchOverlay').classList.add('open');
     setTimeout(() => document.getElementById('searchField').focus(), 300);
 }
 
 function closeSearch() {
+    if (!document.getElementById('searchOverlay').classList.contains('open')) return;
     document.getElementById('searchOverlay').classList.remove('open');
     document.getElementById('searchField').value = '';
     document.getElementById('searchResultsGrid').innerHTML = `
@@ -1542,6 +1561,8 @@ function closeSearch() {
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Search for movies, TV shows and anime
         </div>`;
+    if (!_skipHistoryBack && _navDepth > 0) { _navDepth--; history.back(); }
+    _updateTgBackBtn();
 }
 
 // Close search on Escape
@@ -1622,6 +1643,12 @@ let selectedFile = null;
 
 async function openModal(item) {
     currentItem = item;
+    rvPush(item);
+    if (!document.getElementById('modalBackdrop').classList.contains('open')) {
+        history.pushState({ navType: 'modal' }, '');
+        _navDepth++;
+        _updateTgBackBtn();
+    }
     selectedFile = null;
     hideFileActions();
     resetDetailSections();
@@ -1678,15 +1705,119 @@ async function openModal(item) {
 }
 
 function closeModal() {
+    if (!document.getElementById('modalBackdrop').classList.contains('open')) return;
     document.getElementById('modalBackdrop').classList.remove('open');
     document.body.style.overflow = '';
     currentItem = null;
     selectedFile = null;
     hideFileActions();
+    if (!_skipHistoryBack && _navDepth > 0) { _navDepth--; history.back(); }
+    _updateTgBackBtn();
 }
 
 function handleBackdropClick(e) {
     if (e.target === document.getElementById('modalBackdrop')) closeModal();
+}
+
+// ── NAVIGATION STATE (back button) ────────────────────────────────────────
+let _navDepth = 0;
+let _skipHistoryBack = false;
+
+function _updateTgBackBtn() {
+    try {
+        if (!tg || !tg.BackButton) return;
+        if (_navDepth > 0) {
+            tg.BackButton.show();
+        } else {
+            tg.BackButton.hide();
+        }
+    } catch(e) {}
+}
+
+// Telegram native back button
+try {
+    if (tg && tg.BackButton) {
+        tg.BackButton.onClick(() => {
+            if (document.getElementById('modalBackdrop').classList.contains('open')) {
+                closeModal();
+            } else if (document.getElementById('searchOverlay').classList.contains('open')) {
+                closeSearch();
+            }
+        });
+    }
+} catch(e) {}
+
+// Browser back button / Android hardware back
+window.addEventListener('popstate', () => {
+    _skipHistoryBack = true;
+    if (document.getElementById('modalBackdrop').classList.contains('open')) {
+        if (_navDepth > 0) _navDepth--;
+        closeModal();
+    } else if (document.getElementById('searchOverlay').classList.contains('open')) {
+        if (_navDepth > 0) _navDepth--;
+        closeSearch();
+    }
+    _skipHistoryBack = false;
+    _updateTgBackBtn();
+});
+
+// ── RECENTLY VIEWED ────────────────────────────────────────────────────────
+const _RV_KEY = 'rv_items';
+const _RV_MAX = 12;
+
+function rvLoad() {
+    try { return JSON.parse(localStorage.getItem(_RV_KEY) || '[]'); } catch(e) { return []; }
+}
+
+function rvSave(arr) {
+    try { localStorage.setItem(_RV_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+
+function rvPush(item) {
+    if (!item || !item.title) return;
+    const safe = {
+        id: item.id, source: item.source || 'tmdb',
+        title: item.title, type: item.type || 'movie',
+        year: item.year || '', rating: item.rating || 0,
+        poster: item.poster || '', overview: item.overview || '',
+        backdrop: item.backdrop || '', genres: item.genres || []
+    };
+    let arr = rvLoad().filter(x => !(String(x.id) === String(safe.id) && x.source === safe.source));
+    arr.unshift(safe);
+    if (arr.length > _RV_MAX) arr = arr.slice(0, _RV_MAX);
+    rvSave(arr);
+    renderRecentlyViewed();
+}
+
+function renderRecentlyViewed() {
+    const arr = rvLoad();
+    const sec = document.getElementById('recentlyViewedSection');
+    const row = document.getElementById('rowRecentlyViewed');
+    if (!sec || !row) return;
+    if (!arr.length) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    row.innerHTML = '';
+    arr.forEach((item, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        card.style.animationDelay = `${Math.min(i * 0.04, 0.5)}s`;
+        const typeStr = item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie');
+        const posterHTML = item.poster
+            ? `<img class="poster-img" src="${escapeHTML(item.poster)}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="imgError(this)">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
+                <div class="poster-type-badge">${typeStr}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(item.title)}</div>
+            ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
+        `;
+        card.onclick = () => openModal(item);
+        row.appendChild(card);
+    });
+    enableDragScroll(row);
 }
 
 function escapeHTML(value) {
