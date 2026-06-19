@@ -16,7 +16,7 @@ def _slugify(title: str) -> str:
     return slug
 
 
-async def _get(path: str, params: dict = None, timeout: int = 10):
+async def _get(path: str, params: dict = None, timeout: int = 5):
     url = f"{MULTIMOVIES_BASE}{path}"
     try:
         async with aiohttp.ClientSession() as session:
