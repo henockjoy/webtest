@@ -452,12 +452,30 @@ async def watch_handler(request):
                 'mp4': 'video/mp4',
             }
             resolved_mime = mimetypes.guess_type(file_name)[0] or mime_map.get(ext, 'video/mp4')
+        # Extract episode metadata from query params
+        show_title   = request.query.get('title', '').strip()[:500]
+        media_type_q = request.query.get('type',  'movie').strip()[:20]
+        try:    cur_season  = str(int(request.query.get('season',  '0')))
+        except: cur_season  = '0'
+        try:    cur_episode = str(int(request.query.get('episode', '0')))
+        except: cur_episode = '0'
+        cur_file_id  = request.query.get('file_id', '').strip()[:500]
+        show_title_enc  = urllib.parse.quote(show_title, safe='')
+        show_title_esc  = html.escape(show_title)
+        media_type_esc  = html.escape(media_type_q)
+        cur_file_id_esc = html.escape(urllib.parse.quote(cur_file_id, safe=''))
         page_html = (watch_tmplt
-                     .replace('{heading}',    heading)
-                     .replace('{file_name}',  file_name_safe)
-                     .replace('{message_id}', str(message_id))
-                     .replace('{mime_type}',  resolved_mime)
-                     .replace('{src}',        src))
+                     .replace('{heading}',         heading)
+                     .replace('{file_name}',        file_name_safe)
+                     .replace('{message_id}',       str(message_id))
+                     .replace('{mime_type}',        resolved_mime)
+                     .replace('{src}',              src)
+                     .replace('{show_title}',       show_title_enc)
+                     .replace('{show_title_esc}',   show_title_esc)
+                     .replace('{media_type}',       media_type_esc)
+                     .replace('{cur_season}',       cur_season)
+                     .replace('{cur_episode}',      cur_episode)
+                     .replace('{cur_file_id}',      cur_file_id_esc))
         return web.Response(text=page_html, content_type='text/html')
     except Exception as e:
         logger.error(f"[watch] template render failed id={message_id}: {e}\n{_tb.format_exc()}")
@@ -480,9 +498,17 @@ async def download_handler(request):
 
 @routes.get("/api/stream-file/{file_id}")
 async def stream_file_handler(request):
-    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}"""
+    """Copy file to BIN_CHANNEL and redirect to /watch/{msg_id}, forwarding episode metadata."""
     try:
         file_id = request.match_info['file_id']
+        # Forward show metadata query params so the watch page can show episode selection
+        qs_parts = {}
+        for key in ('title', 'type', 'season', 'episode'):
+            val = request.query.get(key, '').strip()
+            if val:
+                qs_parts[key] = val
+        qs_parts['file_id'] = file_id
+        qs = '?' + urllib.parse.urlencode(qs_parts) if qs_parts else ''
         try:
             msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
         except Exception as e:
@@ -497,11 +523,30 @@ async def stream_file_handler(request):
                     status=410
                 )
             raise
-        raise web.HTTPFound(location=f"/watch/{msg.id}")
+        raise web.HTTPFound(location=f"/watch/{msg.id}{qs}")
     except web.HTTPFound:
         raise
     except Exception as e:
         return web.Response(text=error_tmplt, content_type='text/html')
+
+
+@routes.get("/api/resolve-file/{file_id}")
+async def resolve_file_handler(request):
+    """Send file to BIN_CHANNEL and return message_id as JSON (used by episode switcher)."""
+    try:
+        file_id = request.match_info['file_id']
+        try:
+            msg = await temp.BOT.send_cached_media(chat_id=BIN_CHANNEL, file_id=file_id)
+        except Exception as e:
+            err_str = str(e).lower()
+            if 'file_reference' in err_str or 'invalid' in err_str or 'expired' in err_str:
+                return web.json_response({"error": "File reference expired. Please retry from the main app."}, status=410)
+            raise
+        return web.json_response({"message_id": msg.id})
+    except web.HTTPFound:
+        raise
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 
 @routes.get("/api/tracks/{message_id}")
