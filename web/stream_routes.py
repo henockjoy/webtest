@@ -1180,6 +1180,17 @@ async def mm_trending_handler(request):
         rating = float(item.get("rating") or item.get("imdb_rating") or 0) or 0
         overview = item.get("overview") or item.get("description") or ""
         from multimovies_api import build_player_url
+        # Normalise genres to a list of plain strings
+        raw_genres = item.get("genres") or item.get("genre") or []
+        if isinstance(raw_genres, str):
+            genres = [g.strip() for g in raw_genres.split(",") if g.strip()]
+        elif isinstance(raw_genres, list):
+            genres = [
+                (g.get("name") if isinstance(g, dict) else str(g)).strip()
+                for g in raw_genres if g
+            ]
+        else:
+            genres = []
         return {
             "slug": slug,
             "title": title,
@@ -1189,6 +1200,7 @@ async def mm_trending_handler(request):
             "backdrop": poster,
             "rating": round(rating, 1),
             "overview": overview[:200],
+            "genres": genres,
             "player_url": build_player_url(slug, type_, title),
             "source": "multimovies",
             "id": slug,
@@ -1216,6 +1228,46 @@ async def mm_trending_handler(request):
         })
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+
+@routes.get("/api/mm-search")
+async def mm_search_handler(request):
+    """Search MultiMoviesAPI for movies/TV shows. Returns formatted items with player URLs."""
+    from multimovies_api import search as mm_search, build_player_url
+    q = request.query.get("q", "").strip()
+    if not q:
+        return web.json_response({"results": []})
+    try:
+        results = await mm_search(q)
+        formatted = []
+        for item in results[:30]:
+            slug = item.get("slug", "")
+            title = item.get("title") or item.get("name") or ""
+            type_ = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
+            year = str(item.get("year") or item.get("release_year") or "")
+            poster = item.get("poster") or item.get("thumbnail") or item.get("image") or None
+            rating_raw = item.get("rating") or item.get("imdb_rating") or 0
+            try:
+                rating = round(float(rating_raw), 1)
+            except (TypeError, ValueError):
+                rating = 0
+            overview = item.get("overview") or item.get("description") or ""
+            formatted.append({
+                "slug": slug,
+                "title": title,
+                "type": type_,
+                "year": year,
+                "poster": poster,
+                "backdrop": poster,
+                "rating": rating,
+                "overview": overview[:200],
+                "player_url": build_player_url(slug, type_, title),
+                "source": "multimovies",
+                "id": slug,
+            })
+        return web.json_response({"results": formatted})
+    except Exception as e:
+        return web.json_response({"results": [], "error": str(e)}, status=500)
 
 
 @routes.get("/api/mm-player")
