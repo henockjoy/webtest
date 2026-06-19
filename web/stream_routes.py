@@ -1165,147 +1165,36 @@ async def today_airing_handler(request):
         return web.json_response({"error": str(e)}, status=500)
 
 
-@routes.get("/api/mm-trending")
-async def mm_trending_handler(request):
-    """Returns MultiMoviesAPI trending/featured items for the web UI,
-    formatted the same way as /api/tmdb-trending rows."""
-    from multimovies_api import get_trending, get_popular, get_featured, get_recently_added
+MULTIMOVIES_BASE = "https://multimoviesapis.vercel.app"
 
-    def _fmt(item):
-        slug = item.get("slug", "")
-        title = item.get("title") or item.get("name") or ""
-        type_ = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
-        year = str(item.get("year") or item.get("release_year") or "")
-        poster = item.get("poster") or item.get("thumbnail") or item.get("image") or None
-        rating = float(item.get("rating") or item.get("imdb_rating") or 0) or 0
-        overview = item.get("overview") or item.get("description") or ""
-        from multimovies_api import build_player_url
-        # Normalise genres to a list of plain strings
-        raw_genres = item.get("genres") or item.get("genre") or []
-        if isinstance(raw_genres, str):
-            genres = [g.strip() for g in raw_genres.split(",") if g.strip()]
-        elif isinstance(raw_genres, list):
-            genres = [
-                (g.get("name") if isinstance(g, dict) else str(g)).strip()
-                for g in raw_genres if g
-            ]
-        else:
-            genres = []
-        return {
-            "slug": slug,
-            "title": title,
-            "type": type_,
-            "year": year,
-            "poster": poster,
-            "backdrop": poster,
-            "rating": round(rating, 1),
-            "overview": overview[:200],
-            "genres": genres,
-            "player_url": build_player_url(slug, type_, title),
-            "source": "multimovies",
-            "id": slug,
-        }
-
+@routes.get("/api/ext/{path:.*}")
+async def ext_proxy_handler(request):
+    """Proxy requests to multimoviesapis.vercel.app with timeout and graceful fallback."""
+    path = request.match_info.get("path", "")
+    query_string = request.query_string
+    target_url = f"{MULTIMOVIES_BASE}/api/{path}"
+    if query_string:
+        target_url += f"?{query_string}"
     try:
-        trending_movies, trending_tv, featured, new_movies, new_tv = await asyncio.gather(
-            get_trending("movie"),
-            get_trending("tv"),
-            get_featured(),
-            get_recently_added("movie"),
-            get_recently_added("tv"),
-        )
-        all_trending = [_fmt(i) for i in (trending_movies or [])[:20]]
-        all_trending_tv = [_fmt(i) for i in (trending_tv or [])[:20]]
-        all_featured = [_fmt(i) for i in (featured or [])[:20]]
-        all_new = [_fmt(i) for i in (new_movies or [])[:20]]
-        all_new_tv = [_fmt(i) for i in (new_tv or [])[:20]]
-        # If every list is empty the upstream API is down — tell the client clearly
-        if not any([all_trending, all_trending_tv, all_featured, all_new, all_new_tv]):
-            return web.json_response(
-                {"error": "Content unavailable — MultiMoviesAPI did not return data. Try again later."},
-                status=503,
-            )
-        return web.json_response({
-            "trending_movies": all_trending,
-            "trending_tv": all_trending_tv,
-            "featured": all_featured,
-            "new_movies": all_new,
-            "new_tv": all_new_tv,
-        })
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                target_url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
+            ) as resp:
+                ct = resp.headers.get("Content-Type", "application/json")
+                body = await resp.read()
+                return web.Response(
+                    body=body,
+                    status=resp.status,
+                    headers={
+                        "Content-Type": ct,
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "public, max-age=300"
+                    }
+                )
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
-
-
-@routes.get("/api/mm-search")
-async def mm_search_handler(request):
-    """Search MultiMoviesAPI for movies/TV shows. Returns formatted items with player URLs."""
-    from multimovies_api import search as mm_search, build_player_url
-    q = request.query.get("q", "").strip()
-    if not q:
-        return web.json_response({"results": []})
-    try:
-        results = await mm_search(q)
-        formatted = []
-        for item in results[:30]:
-            slug = item.get("slug", "")
-            title = item.get("title") or item.get("name") or ""
-            type_ = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
-            year = str(item.get("year") or item.get("release_year") or "")
-            poster = item.get("poster") or item.get("thumbnail") or item.get("image") or None
-            rating_raw = item.get("rating") or item.get("imdb_rating") or 0
-            try:
-                rating = round(float(rating_raw), 1)
-            except (TypeError, ValueError):
-                rating = 0
-            overview = item.get("overview") or item.get("description") or ""
-            formatted.append({
-                "slug": slug,
-                "title": title,
-                "type": type_,
-                "year": year,
-                "poster": poster,
-                "backdrop": poster,
-                "rating": rating,
-                "overview": overview[:200],
-                "player_url": build_player_url(slug, type_, title),
-                "source": "multimovies",
-                "id": slug,
-            })
-        return web.json_response({"results": formatted})
-    except Exception as e:
-        return web.json_response({"results": [], "error": str(e)}, status=500)
-
-
-@routes.get("/api/mm-player")
-async def mm_player_handler(request):
-    """Searches MultiMoviesAPI for a title and returns its player URL."""
-    from multimovies_api import find_best_match, build_player_url
-    title = request.query.get("title", "").strip()
-    type_ = request.query.get("type", "movie").strip()
-    season = request.query.get("season")
-    episode = request.query.get("episode")
-    if not title:
-        return web.json_response({"error": "Missing title"}, status=400)
-    try:
-        item = await find_best_match(title)
-        if not item:
-            return web.json_response({"player_url": None, "found": False})
-        slug = item.get("slug", "")
-        matched_type = "tv" if item.get("type") in ("tv", "tvshow", "series") else "movie"
-        player_url = build_player_url(
-            slug, matched_type, title,
-            season=int(season) if season else None,
-            episode=int(episode) if episode else None,
-        )
-        return web.json_response({
-            "found": True,
-            "player_url": player_url,
-            "slug": slug,
-            "title": item.get("title") or item.get("name") or title,
-            "type": matched_type,
-        })
-    except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        return web.json_response({"success": False, "error": str(e), "results": []}, status=200)
 
 
 async def media_download(request, message_id: int):
