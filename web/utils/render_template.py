@@ -456,8 +456,6 @@ webapp_template = """
         }
         .watch-pill { background: var(--accent); }
         .watch-pill:hover { background: #ff0f1b; }
-        .stream-pill { background: #1a3a5c; border: 1px solid rgba(100,160,240,0.3); color: #7ec8f7; }
-        .stream-pill:hover { background: #1e4573; }
         .download-pill { background: var(--card2); border: 1px solid var(--border); }
         .modal-poster {
             width: 64px; height: 95px; border-radius: var(--radius-sm);
@@ -1111,10 +1109,6 @@ webapp_template = """
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
                 Watch Online
             </a>
-            <a class="action-pill stream-pill" id="streamAction" target="_blank" rel="noopener">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                Stream
-            </a>
             <button class="action-pill download-pill" id="downloadAction" type="button">Download</button>
         </div>
     </div>
@@ -1557,8 +1551,11 @@ document.getElementById('searchField').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     const q = e.target.value.trim();
     if (!q) {
-        closeSearch();
-        openSearch();
+        document.getElementById('searchResultsGrid').innerHTML = `
+            <div class="search-hint" style="grid-column:1/-1">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Search for movies, TV shows and anime
+            </div>`;
         return;
     }
     document.getElementById('searchResultsGrid').innerHTML = `
@@ -2091,7 +2088,6 @@ function selectFile(file, el) {
     document.getElementById('selectedFileName').textContent = `${file.name} (${file.size})`;
     const playerUrl = makePlayerUrl(currentItem, file);
     document.getElementById('watchAction').href = playerUrl;
-    document.getElementById('streamAction').href = `/api/stream-file/${file.id}`;
     document.getElementById('downloadAction').onclick = () => getFile(file.id);
     document.getElementById('fileActionBar').classList.add('show');
     showToast('File selected — click Watch Online to stream');
@@ -2101,7 +2097,6 @@ function hideFileActions() {
     document.getElementById('fileActionBar').classList.remove('show');
     document.getElementById('selectedFileName').textContent = '';
     document.getElementById('watchAction').removeAttribute('href');
-    document.getElementById('streamAction').removeAttribute('href');
 }
 
 function getFile(fileId) {
