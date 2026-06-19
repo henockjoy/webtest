@@ -169,6 +169,37 @@ webapp_template = """
             object-fit: cover;
         }
 
+        /* ── Search history ── */
+        .search-history-bar { padding: 12px 16px 0; }
+        .search-history-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .search-history-title {
+            font-size: 11px; color: var(--text3); text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 800;
+        }
+        .sh-clear-btn {
+            background: none; border: none; color: var(--text3);
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            padding: 0; transition: color 0.15s;
+        }
+        .sh-clear-btn:hover { color: var(--text1); }
+        .search-history-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .sh-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+            color: var(--text2); font-size: 12px; font-weight: 600;
+            padding: 6px 12px; border-radius: 20px; cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .sh-chip:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .sh-chip-remove {
+            background: none; border: none; color: var(--text3);
+            padding: 0; font-size: 15px; line-height: 1; cursor: pointer;
+            transition: color 0.15s; margin-left: 2px;
+        }
+        .sh-chip-remove:hover { color: #fff; }
         .search-hint {
             text-align: center; color: var(--text3); font-size: 14px;
             padding: 60px 20px; grid-column: 1 / -1;
@@ -402,6 +433,87 @@ webapp_template = """
             font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.7px;
             padding: 5px 8px; border-radius: 6px; text-decoration: none;
         }
+        .modal-watch-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--accent); color: #fff; border: none;
+            font-size: 13px; font-weight: 700; padding: 10px 18px;
+            border-radius: 10px; text-decoration: none; cursor: pointer;
+            margin-top: 12px; transition: opacity 0.2s;
+        }
+        .modal-watch-btn:hover { opacity: 0.85; }
+        /* ── Genre filter bar ── */
+        .genre-filter-section {
+            padding: 4px 20px 0;
+        }
+        .genre-filter-label {
+            font-size: 11px; color: var(--text3); text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 800; margin-bottom: 8px;
+        }
+        .genre-filter-bar {
+            display: flex; flex-wrap: nowrap; gap: 8px;
+            overflow-x: auto; padding-bottom: 8px;
+            scrollbar-width: none;
+        }
+        .genre-filter-bar::-webkit-scrollbar { display: none; }
+        .genre-chip {
+            flex-shrink: 0;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+            color: var(--text2); font-size: 12px; font-weight: 700;
+            padding: 6px 14px; border-radius: 20px; cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            white-space: nowrap;
+        }
+        .genre-chip:hover { background: rgba(255,255,255,0.12); color: var(--text1); }
+        .genre-chip.active {
+            background: var(--accent); border-color: var(--accent); color: #fff;
+        }
+        .poster-card.genre-hidden { display: none; }
+        /* ── Continue Watching ── */
+        .cw-clear-btn {
+            background: none; border: 1px solid var(--border); color: var(--text3);
+            font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px;
+            cursor: pointer; transition: color 0.15s, border-color 0.15s;
+        }
+        .cw-clear-btn:hover { color: var(--text1); border-color: var(--text2); }
+        .poster-card .cw-remove {
+            position: absolute; top: 5px; right: 5px; z-index: 3;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(0,0,0,0.7); border: none; color: #fff;
+            font-size: 13px; line-height: 22px; text-align: center;
+            cursor: pointer; display: none; padding: 0;
+            transition: background 0.15s;
+        }
+        .poster-card:hover .cw-remove { display: block; }
+        .cw-remove:hover { background: rgba(220,50,50,0.85); }
+        /* ── Watchlist ── */
+        .nav-wl-btn {
+            position: relative; background: none; border: 1px solid var(--border);
+            color: var(--text2); font-size: 18px; width: 36px; height: 36px;
+            border-radius: 50%; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .nav-wl-btn:hover { background: var(--card2); color: #ff4d6d; border-color: #ff4d6d; }
+        .nav-wl-btn.has-items { color: #ff4d6d; border-color: #ff4d6d; }
+        .wl-count-badge {
+            position: absolute; top: -4px; right: -4px;
+            background: var(--accent); color: #fff;
+            font-size: 9px; font-weight: 800; min-width: 16px; height: 16px;
+            border-radius: 8px; padding: 0 4px;
+            display: flex; align-items: center; justify-content: center;
+            line-height: 1; display: none;
+        }
+        .poster-card .wl-heart {
+            position: absolute; top: 5px; left: 5px; z-index: 3;
+            width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(0,0,0,0.65); border: none; color: var(--text3);
+            font-size: 14px; line-height: 26px; text-align: center;
+            cursor: pointer; padding: 0; display: none;
+            transition: background 0.15s, color 0.15s;
+        }
+        .poster-card:hover .wl-heart { display: block; }
+        .poster-card .wl-heart.wl-active { display: block; color: #ff4d6d; }
+        .poster-card .wl-heart:hover { background: rgba(255,77,109,0.25); color: #ff4d6d; }
         .detail-section { padding: 16px 20px 0; }
         .detail-section-title {
             font-size: 12px; color: var(--text3); text-transform: uppercase;
@@ -629,9 +741,37 @@ webapp_template = """
         .repair-sub { font-size: 15px; color: var(--text2); line-height: 1.6; max-width: 320px; }
 
         /* ── SKELETON ── */
-        .skel { background: linear-gradient(90deg, var(--card) 25%, var(--card2) 50%, var(--card) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: var(--radius-sm); }
-        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-        .skel-poster { width: 120px; height: 178px; border-radius: var(--radius-sm); flex-shrink: 0; }
+        @keyframes shimmer {
+            0%   { background-position: -300% 0; }
+            100% { background-position: 300% 0; }
+        }
+        .skel {
+            background: linear-gradient(
+                90deg,
+                var(--card)               0%,
+                var(--card2)              28%,
+                rgba(255,255,255,0.09)    50%,
+                var(--card2)              72%,
+                var(--card)               100%
+            );
+            background-size: 300% 100%;
+            animation: shimmer 1.8s ease-in-out infinite;
+            border-radius: var(--radius-sm);
+        }
+        /* Stagger each card in a row */
+        .skel-card:nth-child(1) .skel { animation-delay: 0s; }
+        .skel-card:nth-child(2) .skel { animation-delay: 0.12s; }
+        .skel-card:nth-child(3) .skel { animation-delay: 0.24s; }
+        .skel-card:nth-child(4) .skel { animation-delay: 0.36s; }
+        .skel-card:nth-child(5) .skel { animation-delay: 0.48s; }
+        .skel-card {
+            flex-shrink: 0; width: 120px;
+            display: flex; flex-direction: column;
+        }
+        .skel-poster-img { width: 120px; height: 178px; border-radius: var(--radius-sm); }
+        .skel-title-line { height: 11px; width: 80%; border-radius: 6px; margin-top: 8px; }
+        .skel-year-line  { height: 9px;  width: 45%; border-radius: 6px; margin-top: 5px; }
+        /* keep old .skel-text for any other uses */
         .skel-text { height: 12px; border-radius: 6px; margin-top: 8px; }
 
         /* ── SPINNER ── */
@@ -855,14 +995,16 @@ webapp_template = """
         @media (min-width: 600px) {
             .poster-card { width: 150px; }
             .poster-img-wrap { width: 150px; height: 224px; }
-            .skel-poster { width: 150px; height: 224px; }
+            .skel-card { width: 150px; }
+            .skel-poster-img { width: 150px; height: 224px; }
             .search-top-bar { padding-top: 80px; padding-left: 24px; padding-right: 24px; }
             .search-results-grid { padding-left: 24px; padding-right: 24px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; }
         }
         @media (min-width: 900px) {
             .poster-card { width: 170px; }
             .poster-img-wrap { width: 170px; height: 255px; }
-            .skel-poster { width: 170px; height: 255px; }
+            .skel-card { width: 170px; }
+            .skel-poster-img { width: 170px; height: 255px; }
             .row-header { padding: 0 36px; }
             .poster-scroll { padding: 12px 24px 20px; scroll-padding: 0 24px; }
             .hero-content { padding: 0 48px 44px; }
@@ -889,9 +1031,9 @@ webapp_template = """
         <span>Search movies, series, anime</span>
     </button>
     <div class="nav-right">
-        <button class="nav-today-btn" onclick="openTodayPanel()" title="Today Airing">
-            <span class="nav-today-dot"></span>
-            Today
+        <button class="nav-wl-btn" id="navWlBtn" onclick="scrollToWatchlist()" title="My Watchlist">
+            ♡
+            <span class="wl-count-badge" id="wlCountBadge"></span>
         </button>
         <button class="nav-search-toggle" id="searchToggle" onclick="openSearch()" title="Search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -909,28 +1051,13 @@ webapp_template = """
         </div>
         <button class="search-close" onclick="closeSearch()">Cancel</button>
     </div>
+    <!-- Recent searches (shown when field is empty) -->
+    <div class="search-history-bar" id="searchHistoryBar" style="display:none"></div>
     <div class="search-results-grid" id="searchResultsGrid">
         <div class="search-hint" style="grid-column:1/-1">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Search for movies, TV shows and anime
         </div>
-    </div>
-</div>
-
-<!-- TODAY AIRING PANEL -->
-<div class="today-panel" id="todayPanel">
-    <div class="today-panel-header">
-        <div class="today-panel-title">📅 Today Airing</div>
-        <button class="today-panel-close" onclick="closeTodayPanel()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-    </div>
-    <div class="today-tabs" id="todayTabs">
-        <button class="today-tab active" data-tab="tv" onclick="switchTodayTab('tv')">TV Shows</button>
-        <button class="today-tab" data-tab="anime" onclick="switchTodayTab('anime')">Anime</button>
-    </div>
-    <div class="today-list" id="todayList">
-        <div class="today-spinner"><div class="spinner"></div></div>
     </div>
 </div>
 
@@ -955,25 +1082,26 @@ webapp_template = """
 <!-- MAIN CONTENT ROWS -->
 <main class="main" id="main">
 
-    <!-- ── TODAY RELEASED (TV Series · Anime · OTT Movies) ── -->
-    <section class="today-released-section fade-up" id="todayReleasedSection">
-        <div class="today-released-header">
-            <div class="today-released-title">
-                <span></span>Today's Releases
+    <!-- ── WATCHLIST ── -->
+    <section class="row-section fade-up" id="watchlistSection" style="display:none">
+        <div class="row-header">
+            <div class="row-title" style="display:flex;align-items:center;gap:8px">
+                <span>❤️</span>My Watchlist
             </div>
-            <div class="live-badge"><span class="live-dot"></span>Live</div>
+            <button class="cw-clear-btn" onclick="clearWatchlist()">Clear all</button>
         </div>
-        <div class="today-filter-row" id="todayFilterRow">
-            <button class="today-tag active" data-filter="all"   onclick="filterTodayReleased('all')">All</button>
-            <button class="today-tag"        data-filter="tv"    onclick="filterTodayReleased('tv')">TV Series</button>
-            <button class="today-tag"        data-filter="anime" onclick="filterTodayReleased('anime')">Anime</button>
-            <button class="today-tag"        data-filter="movie" onclick="filterTodayReleased('movie')">OTT Movies</button>
+        <div class="poster-scroll" id="rowWatchlist"></div>
+    </section>
+
+    <!-- ── CONTINUE WATCHING ── -->
+    <section class="row-section fade-up" id="continueWatchingSection" style="display:none">
+        <div class="row-header">
+            <div class="row-title" style="display:flex;align-items:center;gap:8px">
+                <span>▶</span>Continue Watching
+            </div>
+            <button class="cw-clear-btn" onclick="clearAllWatched()">Clear all</button>
         </div>
-        <div class="poster-scroll" id="rowTodayReleased">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
-        </div>
+        <div class="poster-scroll" id="rowContinueWatching"></div>
     </section>
 
     <!-- ── RECENTLY ADDED (bot database) ── -->
@@ -985,95 +1113,52 @@ webapp_template = """
             </div>
         </div>
         <div class="poster-scroll" id="rowRecentlyAdded">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
         </div>
     </section>
 
-    <!-- Trending Row -->
-    <section class="row-section fade-up">
+    <!-- Genre filter bar (populated by JS after MM data loads) -->
+    <section class="genre-filter-section" id="genreFilterSection" style="display:none">
+        <div class="genre-filter-label">Browse by Genre</div>
+        <div class="genre-filter-bar" id="genreFilterBar"></div>
+    </section>
+
+    <!-- Trending Movies Row -->
+    <section class="row-section fade-up" id="mmMoviesSection" style="animation-delay:0.08s">
         <div class="row-header">
-            <div class="row-title"><span></span>Trending This Week</div>
+            <div class="row-title"><span></span>🔥 Trending Movies</div>
         </div>
-        <div class="poster-scroll" id="rowTrending">
-            <!-- skeleton -->
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
+        <div class="poster-scroll" id="rowMMMovies">
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
         </div>
     </section>
 
-    <!-- Popular Movies Row -->
-    <section class="row-section fade-up" style="animation-delay:0.08s">
+    <!-- Trending TV Row -->
+    <section class="row-section fade-up" id="mmTVSection" style="animation-delay:0.16s">
         <div class="row-header">
-            <div class="row-title"><span></span>Popular Movies</div>
+            <div class="row-title"><span></span>📺 Trending TV Shows</div>
         </div>
-        <div class="poster-scroll" id="rowMovies">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
+        <div class="poster-scroll" id="rowMMTV">
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
         </div>
     </section>
 
-    <!-- Popular TV Row -->
-    <section class="row-section fade-up" style="animation-delay:0.16s">
+    <!-- New Releases Row -->
+    <section class="row-section fade-up" id="mmNewSection" style="animation-delay:0.24s">
         <div class="row-header">
-            <div class="row-title"><span></span>Popular TV Shows</div>
+            <div class="row-title"><span></span>🆕 New Releases</div>
         </div>
-        <div class="poster-scroll" id="rowTV">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
+        <div class="poster-scroll" id="rowMMNew">
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div><div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
+            <div class="skel-card"><div class="skel skel-poster-img"></div><div class="skel skel-title-line"></div><div class="skel skel-year-line"></div></div>
         </div>
-    </section>
-
-    <!-- Top Rated Row -->
-    <section class="row-section fade-up" style="animation-delay:0.24s">
-        <div class="row-header">
-            <div class="row-title"><span></span>Top Rated</div>
-        </div>
-        <div class="poster-scroll" id="rowTopRated">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
-        </div>
-    </section>
-
-    <!-- Popular Anime Row -->
-    <section class="row-section fade-up" style="animation-delay:0.32s">
-        <div class="row-header">
-            <div class="row-title"><span></span>Popular Anime</div>
-        </div>
-        <div class="poster-scroll" id="rowAnime">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
-        </div>
-    </section>
-
-    <!-- Watch Online: MultiMoviesAPI Trending Movies -->
-    <section class="row-section fade-up" id="mmMoviesSection" style="display:none;animation-delay:0.40s">
-        <div class="row-header">
-            <div class="row-title"><span></span>🌐 Watch Online — Movies</div>
-        </div>
-        <div class="poster-scroll" id="rowMMMovies"></div>
-    </section>
-
-    <!-- Watch Online: MultiMoviesAPI Trending TV -->
-    <section class="row-section fade-up" id="mmTVSection" style="display:none;animation-delay:0.48s">
-        <div class="row-header">
-            <div class="row-title"><span></span>🌐 Watch Online — TV Shows</div>
-        </div>
-        <div class="poster-scroll" id="rowMMTV"></div>
-    </section>
-
-    <!-- Watch Online: MultiMoviesAPI New Releases -->
-    <section class="row-section fade-up" id="mmNewSection" style="display:none;animation-delay:0.56s">
-        <div class="row-header">
-            <div class="row-title"><span></span>🌐 New Releases Online</div>
-        </div>
-        <div class="poster-scroll" id="rowMMNew"></div>
     </section>
 
 </main>
@@ -1199,8 +1284,9 @@ function setHero(item) {
     const overview = document.getElementById('heroOverview');
     const btn = document.getElementById('heroBtn');
 
-    if (item.backdrop) {
-        bg.style.backgroundImage = `url('${item.backdrop}')`;
+    const imgSrc = item.backdrop || item.poster;
+    if (imgSrc) {
+        bg.style.backgroundImage = `url('${imgSrc}')`;
         bg.style.opacity = '1';
     } else {
         bg.style.opacity = '0';
@@ -1213,6 +1299,11 @@ function setHero(item) {
         ${item.year ? '<span class="dot"></span>' : ''}
         <span style="text-transform:capitalize">${typeLabel(item.type)}</span>
     `;
+    if (item.player_url) {
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg> Watch Now';
+    } else {
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg> Get Files';
+    }
     btn.onclick = () => openModal(item);
 }
 
@@ -1262,28 +1353,76 @@ function renderRow(containerId, items) {
 function renderMMCard(item) {
     const el = document.createElement('div');
     el.className = 'poster-card';
-    const ratingHtml = item.rating > 0
-        ? `<div class="card-rating">⭐ ${item.rating}</div>`
-        : '';
+    const genres = Array.isArray(item.genres) ? item.genres : [];
+    if (genres.length) el.dataset.genres = genres.join(',');
+    el.dataset.itemId = String(item.id);
+    const inWl = isInWatchlist(item.id);
+    const posterHTML = item.poster
+        ? `<img src="${item.poster}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="imgError(this)">`
+        : `<div class="poster-placeholder">🎬</div>`;
     el.innerHTML = `
-        <div class="card-img-wrap">
-            ${item.poster
-                ? `<img src="${item.poster}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="imgError(this)">`
-                : `<div class="card-img-placeholder">🎬</div>`}
-            ${ratingHtml}
-            <div class="card-play-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M5 3l14 9-14 9V3z"/></svg>
-            </div>
+        <div class="poster-img-wrap">
+            ${posterHTML}
+            ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
+            <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+            <button class="wl-heart${inWl ? ' wl-active' : ''}" title="${inWl ? 'Remove from Watchlist' : 'Add to Watchlist'}"
+                onclick="toggleWatchlist(event, ${JSON.stringify(JSON.stringify(item))})">${inWl ? '❤️' : '♡'}</button>
         </div>
-        <div class="card-title">${escapeHTML(item.title)}</div>
-        ${item.year ? `<div class="card-year">${item.year}</div>` : ''}
+        <div class="poster-title">${escapeHTML(item.title)}</div>
+        ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
     `;
-    el.onclick = () => {
-        if (item.player_url) {
-            window.open(item.player_url, '_blank', 'noopener');
-        }
-    };
+    el.onclick = () => openModal(item);
     return el;
+}
+
+let _activeGenre = 'all';
+
+function buildGenreFilter(allItems) {
+    const genreSet = new Set();
+    allItems.forEach(item => {
+        (item.genres || []).forEach(g => { if (g) genreSet.add(g); });
+    });
+    const genres = [...genreSet].sort();
+    if (!genres.length) return;
+
+    const bar = document.getElementById('genreFilterBar');
+    const section = document.getElementById('genreFilterSection');
+    if (!bar || !section) return;
+
+    bar.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.className = 'genre-chip active';
+    allBtn.textContent = 'All';
+    allBtn.onclick = () => filterByGenre('all');
+    bar.appendChild(allBtn);
+
+    genres.forEach(g => {
+        const btn = document.createElement('button');
+        btn.className = 'genre-chip';
+        btn.textContent = g;
+        btn.onclick = () => filterByGenre(g);
+        bar.appendChild(btn);
+    });
+    section.style.display = '';
+}
+
+function filterByGenre(genre) {
+    _activeGenre = genre;
+    document.querySelectorAll('#genreFilterBar .genre-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === genre || (genre === 'all' && btn.textContent === 'All'));
+    });
+    ['rowMMMovies', 'rowMMTV', 'rowMMNew'].forEach(rowId => {
+        const row = document.getElementById(rowId);
+        if (!row) return;
+        row.querySelectorAll('.poster-card').forEach(card => {
+            if (genre === 'all') {
+                card.classList.remove('genre-hidden');
+            } else {
+                const cardGenres = (card.dataset.genres || '').split(',').map(g => g.trim());
+                card.classList.toggle('genre-hidden', !cardGenres.includes(genre));
+            }
+        });
+    });
 }
 
 async function loadMMContent(asFallback = false) {
@@ -1328,33 +1467,26 @@ async function loadMMContent(asFallback = false) {
 
 // ── LOAD HOME ─────────────────────────────────────────────────────────────
 async function loadHome() {
-    // 1. Check repair mode first
-    try {
-        const rs = await fetch('/api/repair-status');
-        const rd = await rs.json();
-        if (rd.repair_mode) {
-            document.getElementById('repairOverlay').classList.add('show');
-            // Still load MultiMoviesAPI content so page isn't blank
-            loadMMContent(true);
-            return;
-        }
-    } catch(e) {}
+    const emptyMsg = '<div style="padding:20px 16px;color:var(--text3);font-size:13px">Could not load. Check connection.</div>';
 
-    // 2. Load trending immediately — this is the critical first paint
-    let trendingMovies = [];
+    // 1. Load MultiMoviesAPI content — primary data source
     try {
-        const resp = await fetch('/api/tmdb-trending');
+        const resp = await fetch('/api/mm-trending');
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
-        botUsername = data.bot_username || botUsername;
 
-        heroItems = (data.trending || []).filter(x => x.backdrop).slice(0, 6);
-        if (!heroItems.length) heroItems = (data.trending || []).slice(0, 6);
+        // Hero: use featured items first, fallback to trending movies
+        const heroSource = (data.featured && data.featured.length > 0)
+            ? data.featured
+            : (data.trending_movies || []);
+        heroItems = heroSource.filter(x => x.poster).slice(0, 6);
+        if (!heroItems.length) heroItems = heroSource.slice(0, 6);
+
         if (heroItems.length > 0) {
             setHero(heroItems[0]);
             const dotsEl = document.getElementById('heroDots');
             dotsEl.innerHTML = '';
-            heroItems.slice(0, 6).forEach((_, i) => {
+            heroItems.forEach((_, i) => {
                 const d = document.createElement('div');
                 d.className = 'hero-dot' + (i === 0 ? ' active' : '');
                 d.onclick = () => { heroIndex = i; setHero(heroItems[i]); updateDots(); clearInterval(heroTimer); startHeroRotation(); };
@@ -1363,26 +1495,39 @@ async function loadHome() {
             startHeroRotation();
         }
 
-        if (data.trending)       { renderRow('rowTrending',  data.trending);       enableDragScroll(document.getElementById('rowTrending')); }
-        if (data.popular_movies) { renderRow('rowMovies',    data.popular_movies); enableDragScroll(document.getElementById('rowMovies')); trendingMovies = data.popular_movies; }
-        if (data.popular_tv)     { renderRow('rowTV',        data.popular_tv);     enableDragScroll(document.getElementById('rowTV')); }
-        if (data.top_rated)      { renderRow('rowTopRated',  data.top_rated);      enableDragScroll(document.getElementById('rowTopRated')); }
-        if (data.popular_anime)  { renderRow('rowAnime',     data.popular_anime);  enableDragScroll(document.getElementById('rowAnime')); }
+        const populate = (rowId, items) => {
+            if (!items || !items.length) return;
+            const row = document.getElementById(rowId);
+            if (!row) return;
+            row.innerHTML = '';
+            items.forEach(item => row.appendChild(renderMMCard(item)));
+            enableDragScroll(row);
+        };
+        populate('rowMMMovies', data.trending_movies);
+        populate('rowMMTV',     data.trending_tv);
+        const newItems = [...(data.new_movies || []), ...(data.new_tv || [])].slice(0, 20);
+        populate('rowMMNew', newItems);
+
+        // Build genre filter from all loaded items
+        const allMMItems = [
+            ...(data.trending_movies || []),
+            ...(data.trending_tv || []),
+            ...newItems
+        ];
+        buildGenreFilter(allMMItems);
+
     } catch(e) {
-        console.error('Trending load failed:', e);
+        console.error('MM content load failed:', e);
         document.getElementById('heroTitle').textContent = 'Could not load content';
-        document.getElementById('heroOverview').textContent = 'Check your TMDB API key or network connection.';
-        const emptyMsg = '<div style="padding:20px 16px;color:var(--text3);font-size:13px">Could not load. Check connection.</div>';
-        ['rowTrending','rowMovies','rowTV','rowTopRated','rowAnime'].forEach(id => {
+        document.getElementById('heroOverview').textContent = 'Check network connection.';
+        ['rowMMMovies','rowMMTV','rowMMNew'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = emptyMsg;
         });
     }
 
-    // 3. Load today-airing + recently-added + MM content in background — won't block main rows
-    loadTodayReleased(trendingMovies);
+    // 2. Load recently-added bot files in background
     loadRecentlyAdded();
-    loadMMContent(false);
 }
 
 async function loadTodayReleased(trendingMovies) {
@@ -1609,12 +1754,16 @@ let searchTimer = null;
 
 function openSearch() {
     document.getElementById('searchOverlay').classList.add('open');
-    setTimeout(() => document.getElementById('searchField').focus(), 300);
+    setTimeout(() => {
+        document.getElementById('searchField').focus();
+        showSearchHistory();
+    }, 300);
 }
 
 function closeSearch() {
     document.getElementById('searchOverlay').classList.remove('open');
     document.getElementById('searchField').value = '';
+    document.getElementById('searchHistoryBar').style.display = 'none';
     document.getElementById('searchResultsGrid').innerHTML = `
         <div class="search-hint" style="grid-column:1/-1">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1629,10 +1778,16 @@ document.getElementById('searchField').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     const q = e.target.value.trim();
     if (!q) {
-        closeSearch();
-        openSearch();
+        document.getElementById('searchHistoryBar').style.display = 'none';
+        showSearchHistory();
+        document.getElementById('searchResultsGrid').innerHTML = `
+            <div class="search-hint" style="grid-column:1/-1">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Search for movies, TV shows and anime
+            </div>`;
         return;
     }
+    document.getElementById('searchHistoryBar').style.display = 'none';
     document.getElementById('searchResultsGrid').innerHTML = `
         <div class="search-hint" style="grid-column:1/-1">
             <div class="spinner"></div>Searching...
@@ -1645,50 +1800,98 @@ document.getElementById('searchField').addEventListener('keydown', (e) => {
 });
 
 async function doSearch(q) {
+    const grid = document.getElementById('searchResultsGrid');
     try {
-        const resp = await fetch(`/api/tmdb-search?q=${encodeURIComponent(q)}`);
+        const resp = await fetch(`/api/mm-search?q=${encodeURIComponent(q)}`);
         const data = await resp.json();
-        const grid = document.getElementById('searchResultsGrid');
         grid.innerHTML = '';
         if (!data.results || data.results.length === 0) {
-            grid.innerHTML = `<div class="search-hint" style="grid-column:1/-1">No results found for "<b>${q}</b>"</div>`;
+            grid.innerHTML = `<div class="search-hint" style="grid-column:1/-1">No results found for "<b>${escapeHTML(q)}</b>"</div>`;
             return;
         }
-        if (data.corrected_query && data.corrected_query.toLowerCase() !== q.toLowerCase()) {
-            const suggestion = document.createElement('div');
-            suggestion.className = 'search-suggestion';
-            suggestion.innerHTML = `Showing best matches for <b>${escapeHTML(data.corrected_query)}</b>`;
-            grid.appendChild(suggestion);
-        }
-        // Results count bar
+        // Save to history on successful results
+        saveSearchQuery(q);
         const bar = document.createElement('div');
         bar.className = 'search-meta-bar';
         bar.style.gridColumn = '1 / -1';
         bar.innerHTML = `Found <b>${data.results.length}</b> results for "<b>${escapeHTML(q)}</b>"`;
         grid.appendChild(bar);
-        // Render premium cards using the same poster-card structure
         data.results.forEach((item, idx) => {
-            const card = document.createElement('div');
-            card.className = 'poster-card';
+            const card = renderMMCard(item);
             card.style.animationDelay = `${Math.min(idx * 0.04, 0.5)}s`;
-            const posterHTML = item.poster
-                ? `<img class="poster-img" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="imgError(this)">`
-                : `<div class="poster-placeholder">🎬</div>`;
-            card.innerHTML = `
-                <div class="poster-img-wrap">
-                    ${posterHTML}
-                    ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                    <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie')}</div>
-                </div>
-                <div class="poster-title">${item.title}</div>
-                ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
-            `;
             card.onclick = () => { closeSearch(); openModal(item); };
             grid.appendChild(card);
         });
     } catch(e) {
-        document.getElementById('searchResultsGrid').innerHTML = `<div class="search-hint" style="grid-column:1/-1">Search failed. Please try again.</div>`;
+        grid.innerHTML = `<div class="search-hint" style="grid-column:1/-1">Search failed. Please try again.</div>`;
     }
+}
+
+// ── SEARCH HISTORY ────────────────────────────────────────────────────────
+const SH_KEY = 'sh_queries';
+const SH_MAX = 8;
+
+function _shLoad() {
+    try { return JSON.parse(localStorage.getItem(SH_KEY) || '[]'); } catch { return []; }
+}
+function _shSave(items) {
+    try { localStorage.setItem(SH_KEY, JSON.stringify(items)); } catch {}
+}
+
+function saveSearchQuery(q) {
+    if (!q || q.length < 2) return;
+    let items = _shLoad().filter(x => x.toLowerCase() !== q.toLowerCase());
+    items.unshift(q);
+    if (items.length > SH_MAX) items = items.slice(0, SH_MAX);
+    _shSave(items);
+}
+
+function removeSearchQuery(q, event) {
+    event.stopPropagation();
+    _shSave(_shLoad().filter(x => x !== q));
+    renderSearchHistory();
+}
+
+function clearSearchHistory() {
+    _shSave([]);
+    document.getElementById('searchHistoryBar').style.display = 'none';
+}
+
+function renderSearchHistory() {
+    const bar = document.getElementById('searchHistoryBar');
+    if (!bar) return;
+    const items = _shLoad();
+    if (!items.length) { bar.style.display = 'none'; return; }
+    bar.innerHTML = `
+        <div class="search-history-header">
+            <span class="search-history-title">Recent Searches</span>
+            <button class="sh-clear-btn" onclick="clearSearchHistory()">Clear all</button>
+        </div>
+        <div class="search-history-chips">
+            ${items.map(q => `
+                <div class="sh-chip" onclick="runHistorySearch(${JSON.stringify(escapeHTML(q))})">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span>${escapeHTML(q)}</span>
+                    <button class="sh-chip-remove" onclick="removeSearchQuery(${JSON.stringify(q)}, event)" title="Remove">×</button>
+                </div>`).join('')}
+        </div>`;
+    bar.style.display = '';
+}
+
+function showSearchHistory() {
+    const items = _shLoad();
+    if (items.length) renderSearchHistory();
+}
+
+function runHistorySearch(q) {
+    const field = document.getElementById('searchField');
+    field.value = q;
+    document.getElementById('searchHistoryBar').style.display = 'none';
+    document.getElementById('searchResultsGrid').innerHTML = `
+        <div class="search-hint" style="grid-column:1/-1">
+            <div class="spinner"></div>Searching...
+        </div>`;
+    doSearch(q);
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────
@@ -1727,16 +1930,25 @@ async function openModal(item) {
         genrePills = `<div class="modal-genres">` + item.genres.slice(0, 3).map(id => `<span class="genre-pill">${genreMap[id] || id || 'Media'}</span>`).join('') + `</div>`;
     }
     
+    const watchNowBtn = item.player_url
+        ? `<a class="modal-watch-btn" href="${item.player_url}" target="_blank" rel="noopener">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+               Watch Now
+           </a>`
+        : '';
     info.innerHTML = `
-        <div class="modal-title">${item.title}</div>
+        <div class="modal-title">${escapeHTML(item.title)}</div>
         <div class="modal-meta">
             ${item.rating > 0 ? `<span class="rating">⭐ ${item.rating}</span>` : ''}
             ${item.year ? `<span>${item.year}</span>` : ''}
             <span style="text-transform:capitalize">${typeLabel(item.type)}</span>
         </div>
         ${genrePills}
-        ${item.overview ? `<div class="modal-overview">${item.overview}</div>` : ''}
+        ${item.overview ? `<div class="modal-overview">${escapeHTML(item.overview)}</div>` : ''}
+        ${watchNowBtn}
     `;
+    // Track in Continue Watching (non-blocking)
+    trackWatched(item);
     // Show modal
     document.getElementById('modalBackdrop').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -1803,30 +2015,7 @@ function renderSources(details) {
     if (links.tvdb) chips.push(`<a class="source-chip" href="${links.tvdb}" target="_blank" rel="noopener">TVDB</a>`);
     if (links.mal) chips.push(`<a class="source-chip" href="${links.mal}" target="_blank" rel="noopener">MyAnimeList</a>`);
     if (links.tmdb) chips.push(`<a class="source-chip" href="${links.tmdb}" target="_blank" rel="noopener">TMDB</a>`);
-    // Placeholder chip — will be replaced by fetchMMWatchChip if a match is found
-    chips.push(`<span class="source-chip mm-watch-chip" id="mmWatchChip" style="opacity:0.4;cursor:default">🌐 Loading...</span>`);
     document.getElementById('detailSources').innerHTML = chips.join('');
-    // Async: fetch MultiMoviesAPI player URL
-    if (details.title) fetchMMWatchChip(details.title, details.type, details.season);
-}
-
-async function fetchMMWatchChip(title, type, season) {
-    try {
-        const params = new URLSearchParams({ title, type: type || 'movie' });
-        if (season) params.set('season', season);
-        const resp = await fetch(`/api/mm-player?${params.toString()}`);
-        const data = await resp.json();
-        const chip = document.getElementById('mmWatchChip');
-        if (!chip) return;
-        if (data.found && data.player_url) {
-            chip.outerHTML = `<a class="source-chip" href="${data.player_url}" target="_blank" rel="noopener" title="Watch on MultiMovies">🌐 Watch Online</a>`;
-        } else {
-            chip.remove();
-        }
-    } catch(e) {
-        const chip = document.getElementById('mmWatchChip');
-        if (chip) chip.remove();
-    }
 }
 
 function renderStats(details) {
@@ -1890,6 +2079,11 @@ function renderQuotes(details) {
 }
 
 async function loadDetailsForItem(item) {
+    // MultiMoviesAPI items already carry all necessary data — skip the TMDB details call
+    if (item.source === 'multimovies') {
+        renderDetailMedia(item);
+        return;
+    }
     try {
         const params = new URLSearchParams({
             source: item.source || 'tmdb',
@@ -1908,7 +2102,7 @@ async function loadDetailsForItem(item) {
         renderQuotes(currentItem);
     } catch(e) {
         renderDetailMedia(item);
-        document.getElementById('detailStats').innerHTML = `<div class="modal-empty-sub" style="padding:0 0 10px">Extra details could not be loaded. Showing available info.</div>`;
+        document.getElementById('detailStats').innerHTML = `<div class="modal-empty-sub" style="padding:0 0 10px">Extra details could not be loaded.</div>`;
     }
 }
 
@@ -2277,8 +2471,178 @@ function renderTodayTab(tab) {
     });
 }
 
+// ── WATCHLIST ─────────────────────────────────────────────────────────────
+const WL_KEY = 'wl_items';
+const WL_MAX = 50;
+
+function _wlLoad() {
+    try { return JSON.parse(localStorage.getItem(WL_KEY) || '[]'); } catch { return []; }
+}
+function _wlSave(items) {
+    try { localStorage.setItem(WL_KEY, JSON.stringify(items)); } catch {}
+}
+
+function isInWatchlist(id) {
+    return _wlLoad().some(x => String(x.id) === String(id));
+}
+
+function toggleWatchlist(event, itemJson) {
+    event.stopPropagation();
+    const item = JSON.parse(itemJson);
+    const id = String(item.id);
+    let items = _wlLoad();
+    const exists = items.some(x => String(x.id) === id);
+    if (exists) {
+        items = items.filter(x => String(x.id) !== id);
+    } else {
+        const keep = ['id','slug','title','type','year','poster','rating','overview','player_url','source','genres'];
+        const entry = {};
+        keep.forEach(k => { if (item[k] !== undefined) entry[k] = item[k]; });
+        entry._ts = Date.now();
+        items.unshift(entry);
+        if (items.length > WL_MAX) items = items.slice(0, WL_MAX);
+    }
+    _wlSave(items);
+    // Update all heart buttons for this item on the page
+    const nowIn = !exists;
+    document.querySelectorAll(`.poster-card[data-item-id="${id}"] .wl-heart`).forEach(btn => {
+        btn.textContent = nowIn ? '❤️' : '♡';
+        btn.title = nowIn ? 'Remove from Watchlist' : 'Add to Watchlist';
+        btn.classList.toggle('wl-active', nowIn);
+    });
+    _updateWlNav();
+    loadWatchlist();
+}
+
+function clearWatchlist() {
+    _wlSave([]);
+    _updateWlNav();
+    loadWatchlist();
+    // Reset all visible heart buttons
+    document.querySelectorAll('.wl-heart').forEach(btn => {
+        btn.textContent = '♡';
+        btn.title = 'Add to Watchlist';
+        btn.classList.remove('wl-active');
+    });
+}
+
+function _updateWlNav() {
+    const items = _wlLoad();
+    const btn = document.getElementById('navWlBtn');
+    const badge = document.getElementById('wlCountBadge');
+    if (!btn || !badge) return;
+    if (items.length > 0) {
+        btn.classList.add('has-items');
+        btn.textContent = '❤️';
+        badge.textContent = items.length > 99 ? '99+' : items.length;
+        badge.style.display = 'flex';
+    } else {
+        btn.classList.remove('has-items');
+        btn.textContent = '♡';
+        badge.textContent = '';
+        badge.style.display = 'none';
+    }
+    // Re-append badge since textContent clears children
+    btn.appendChild(badge);
+}
+
+function loadWatchlist() {
+    const items = _wlLoad();
+    const section = document.getElementById('watchlistSection');
+    const row = document.getElementById('rowWatchlist');
+    if (!section || !row) return;
+    if (!items.length) { section.style.display = 'none'; row.innerHTML = ''; return; }
+
+    row.innerHTML = '';
+    items.forEach(item => {
+        const card = renderMMCard(item);
+        row.appendChild(card);
+    });
+    enableDragScroll(row);
+    section.style.display = '';
+}
+
+function scrollToWatchlist() {
+    const section = document.getElementById('watchlistSection');
+    if (section && section.style.display !== 'none') {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// ── CONTINUE WATCHING ──────────────────────────────────────────────────────
+const CW_KEY = 'cw_items';
+const CW_MAX = 12;
+
+function _cwLoad() {
+    try { return JSON.parse(localStorage.getItem(CW_KEY) || '[]'); } catch { return []; }
+}
+function _cwSave(items) {
+    try { localStorage.setItem(CW_KEY, JSON.stringify(items)); } catch {}
+}
+
+function trackWatched(item) {
+    const keep = ['id','slug','title','type','year','poster','rating','overview','player_url','source','genres'];
+    const entry = {};
+    keep.forEach(k => { if (item[k] !== undefined) entry[k] = item[k]; });
+    entry._ts = Date.now();
+    let items = _cwLoad().filter(x => x.id !== entry.id);
+    items.unshift(entry);
+    if (items.length > CW_MAX) items = items.slice(0, CW_MAX);
+    _cwSave(items);
+    loadContinueWatching();
+}
+
+function removeFromWatched(id, event) {
+    event.stopPropagation();
+    const items = _cwLoad().filter(x => x.id !== id);
+    _cwSave(items);
+    loadContinueWatching();
+}
+
+function clearAllWatched() {
+    _cwSave([]);
+    loadContinueWatching();
+}
+
+function loadContinueWatching() {
+    const items = _cwLoad();
+    const section = document.getElementById('continueWatchingSection');
+    const row = document.getElementById('rowContinueWatching');
+    if (!section || !row) return;
+    if (!items.length) { section.style.display = 'none'; row.innerHTML = ''; return; }
+
+    row.innerHTML = '';
+    items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'poster-card';
+        el.style.position = 'relative';
+        const posterHTML = item.poster
+            ? `<img src="${item.poster}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="imgError(this)">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        el.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
+                <div class="poster-type-badge">${item.type === 'tv' ? 'TV' : 'Movie'}</div>
+                <button class="cw-remove" title="Remove" onclick="removeFromWatched('${escapeHTML(String(item.id))}', event)">✕</button>
+            </div>
+            <div class="poster-title">${escapeHTML(item.title)}</div>
+            ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
+        `;
+        el.onclick = () => openModal(item);
+        row.appendChild(el);
+    });
+    enableDragScroll(row);
+    section.style.display = '';
+}
+
 // ── BOOT ──────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', loadHome);
+window.addEventListener('DOMContentLoaded', () => {
+    loadWatchlist();
+    _updateWlNav();
+    loadContinueWatching();
+    loadHome();
+});
 </script>
 </body>
 </html>
