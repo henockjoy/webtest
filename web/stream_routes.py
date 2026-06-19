@@ -1219,6 +1219,12 @@ async def mm_trending_handler(request):
         all_featured = [_fmt(i) for i in (featured or [])[:20]]
         all_new = [_fmt(i) for i in (new_movies or [])[:20]]
         all_new_tv = [_fmt(i) for i in (new_tv or [])[:20]]
+        # If every list is empty the upstream API is down — tell the client clearly
+        if not any([all_trending, all_trending_tv, all_featured, all_new, all_new_tv]):
+            return web.json_response(
+                {"error": "Content unavailable — MultiMoviesAPI did not return data. Try again later."},
+                status=503,
+            )
         return web.json_response({
             "trending_movies": all_trending,
             "trending_tv": all_trending_tv,
