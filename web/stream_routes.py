@@ -34,45 +34,15 @@ OMDB_BASE = "https://www.omdbapi.com/"
 TVDB_BASE = "https://api4.thetvdb.com/v4"
 TVDB_TOKEN = None
 
-# Noise words stripped when comparing titles
-_TITLE_NOISE = {
-    "the", "a", "an", "movie", "series", "season", "episode", "complete",
-    "hindi", "english", "tamil", "telugu", "malayalam", "kannada", "dual",
-    "audio", "web", "dl", "webrip", "bluray", "hdrip", "x264", "x265",
-    "hevc", "avc", "aac", "esub", "subs", "subtitle", "subtitles",
-    "480p", "720p", "1080p", "2160p", "4k", "uhd", "hd", "sd",
-    "mkv", "mp4", "avi", "mov", "flv", "wmv",
-    "multi", "dubbed", "dubbed", "extended", "theatrical", "unrated",
-    "remastered", "remux", "proper", "repack",
-}
-
-# Quality/tech tags we strip from filenames before title matching (Delta-style)
-_QUALITY_RE = re.compile(
-    r"""(?xi)
-    \b(?:
-        480p|720p|1080p|2160p|4k|uhd|hd|hdrip|webrip|web[-.]?dl|bluray|blu[-.]ray|
-        bdrip|dvdrip|dvdscr|cam|ts|hdcam|r5|
-        x264|x265|h264|h265|hevc|avc|xvid|divx|
-        aac|mp3|ac3|dts|dd5?\.?1|truehd|atmos|
-        10bit|8bit|
-        extended|theatrical|unrated|remastered|remux|proper|repack|
-        multi|dubbed|dual[\s._-]?audio|
-        esub|subs?|subtitle|
-        \d{3,4}MB|\d+GB
-    )\b.*$""",
-    re.IGNORECASE
-)
-
 def normalize_title(value):
     value = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
-    return " ".join(part for part in value.split() if part not in _TITLE_NOISE)
-
-def strip_quality_tags(filename):
-    """Remove quality/codec tags and everything after them — leaves clean title+year."""
-    name = re.sub(r"\.[^.]+$", "", str(filename or ""))   # drop extension
-    name = re.sub(r"[\._\-\[\]\(\)@+]+", " ", name)        # replace separators
-    name = _QUALITY_RE.sub("", name)                        # strip quality tail
-    return " ".join(name.split())
+    noise = {
+        "the", "a", "an", "movie", "series", "season", "episode", "complete",
+        "hindi", "english", "tamil", "telugu", "malayalam", "kannada", "dual",
+        "audio", "web", "dl", "webrip", "bluray", "hdrip", "x264", "x265",
+        "hevc", "aac", "esub", "subs", "subtitle", "480p", "720p", "1080p", "2160p"
+    }
+    return " ".join(part for part in value.split() if part not in noise)
 
 def fuzzy_ratio(left, right):
     left = normalize_title(left)
@@ -83,12 +53,8 @@ def fuzzy_ratio(left, right):
         return 1
     left_tokens = set(left.split())
     right_tokens = set(right.split())
-    if not left_tokens or not right_tokens:
-        return 0
     token_overlap = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
-    # Extra boost when every query token is present in the file title
-    full_containment = 1.0 if right_tokens.issubset(left_tokens) or left_tokens.issubset(right_tokens) else 0
-    return max(SequenceMatcher(None, left, right).ratio(), token_overlap, full_containment * 0.92)
+    return max(SequenceMatcher(None, left, right).ratio(), token_overlap)
 
 def clean_filename_title(value):
     value = re.sub(r"\.[^.]+$", "", str(value or ""))
@@ -160,74 +126,31 @@ def file_model(file):
         "episode": parsed.get("episode"),
     }
 
-def best_title_similarity(file_model_obj, target_norm):
-    """
-    Delta-style: try multiple representations of the file's title against the
-    TMDB target, return the highest similarity score found.
-    """
-    candidates = set()
-
-    # 1. PTN-parsed title
-    if file_model_obj.get("title"):
-        candidates.add(normalize_title(file_model_obj["title"]))
-
-    # 2. Quality-stripped filename (Delta's core trick)
-    stripped = strip_quality_tags(file_model_obj.get("name", ""))
-    if stripped:
-        candidates.add(normalize_title(stripped))
-
-    # 3. Raw cleaned filename
-    raw_clean = clean_filename_title(file_model_obj.get("name", ""))
-    if raw_clean:
-        candidates.add(normalize_title(raw_clean))
-
-    best = 0.0
-    for cand in candidates:
-        if not cand:
-            continue
-        s = fuzzy_ratio(cand, target_norm)
-        if s > best:
-            best = s
-    return best
-
-
 def match_file_to_tmdb(file, title, year=None, media_type=None):
     model = file_model(file)
     target = normalize_title(title)
+    parsed_title = normalize_title(model["title"])
     if not target:
         model["match_score"] = 0
         return model
 
-    similarity = best_title_similarity(model, target)
-
-    # Minimum similarity gate (lowered from 0.72 → 0.60 so PTN quirks don't drop valid files)
-    if similarity < 0.60:
+    similarity = fuzzy_ratio(parsed_title, target)
+    if similarity < 0.72:
         model["match_score"] = 0
         return model
 
     score = similarity
-
-    # Year checks — for movies: mismatch kills; match gives bonus
-    file_year = model.get("year")
-    if media_type == "movie" and year and file_year and str(file_year) != str(year):
+    if media_type == "movie" and year and model.get("year") and str(model["year"]) != str(year):
         model["match_score"] = 0
         return model
-    if year and file_year and str(file_year) == str(year):
-        score += 0.12          # strong year-match bonus
-
-    # Type-shape bonus
+    if year and model.get("year") and str(model["year"]) == str(year):
+        score += 0.08
     if media_type == "tv" and model.get("season") is not None:
         score += 0.05
-    if media_type == "anime" and model.get("season") is not None:
-        score += 0.05
     if media_type == "movie" and model.get("season") is None:
-        score += 0.04
+        score += 0.03
 
-    # Exact normalised-title match — maximum confidence
-    if normalize_title(model.get("title", "")) == target or normalize_title(strip_quality_tags(model.get("name", ""))) == target:
-        score += 0.10
-
-    model["match_score"] = round(min(score, 1.5), 4)   # cap, but allow >1 for sorting
+    model["match_score"] = round(score, 4)
     return model
 
 async def fetch_json(session, url, params=None, headers=None):
@@ -617,6 +540,82 @@ async def tracks_handler(request):
     except Exception as e:
         return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
+MULTIMOVIES_API = "https://multimoviesapis.vercel.app/api"
+
+@routes.get("/api/watch-online")
+async def watch_online_handler(request):
+    """Proxy streaming data from multimoviesapis.vercel.app for a given title."""
+    title = request.query.get("title", "").strip()
+    year  = request.query.get("year", "").strip()
+    mtype = request.query.get("type", "movie").strip()
+    mid   = request.query.get("id", "").strip()
+
+    if not title:
+        return web.json_response({"error": "Missing title"}, status=400)
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; Filmotainment/1.0)",
+        "Accept": "application/json",
+    }
+
+    async def _try(url, params=None):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url, params=params, headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=15)
+                ) as resp:
+                    if resp.status >= 400:
+                        return None
+                    ct = resp.headers.get("Content-Type", "")
+                    if "json" in ct:
+                        return await resp.json(content_type=None)
+                    text = await resp.text()
+                    try:
+                        import json as _json
+                        return _json.loads(text)
+                    except Exception:
+                        return None
+        except Exception:
+            return None
+
+    # Try several common endpoint patterns the API might expose
+    candidates = []
+
+    # 1. Search-style endpoint
+    q = f"{title} {year}".strip() if year else title
+    candidates.append((f"{MULTIMOVIES_API}/search", {"q": q, "query": q, "title": title, "year": year, "type": mtype}))
+
+    # 2. Movie/TV-specific endpoint
+    ep = "tv" if mtype in ("tv", "anime") else "movie"
+    candidates.append((f"{MULTIMOVIES_API}/{ep}", {"title": title, "year": year, "query": title}))
+
+    # 3. TMDB-ID based endpoint
+    if mid:
+        candidates.append((f"{MULTIMOVIES_API}/tmdb/{mid}", {"type": mtype}))
+        candidates.append((f"{MULTIMOVIES_API}/stream", {"tmdb_id": mid, "title": title, "type": mtype}))
+
+    # 4. Generic stream endpoint
+    candidates.append((f"{MULTIMOVIES_API}/stream", {"title": title, "year": year, "type": mtype}))
+    candidates.append((f"{MULTIMOVIES_API}/links", {"title": title, "year": year}))
+
+    data = None
+    for url, params in candidates:
+        clean_params = {k: v for k, v in params.items() if v}
+        result = await _try(url, clean_params)
+        if result and result != {} and result != []:
+            # Filter out pure error responses
+            if isinstance(result, dict) and result.get("error") and len(result) == 1:
+                continue
+            data = result
+            break
+
+    if data is None:
+        return web.json_response([], status=200)
+
+    return web.json_response(data)
+
+
 @routes.get("/", allow_head=True)
 async def webapp_route_handler(request):
     if not TMDB_API_KEY:
@@ -682,65 +681,33 @@ async def api_search_handler(request):
     media_type = request.query.get('type', '').strip()
     year = request.query.get('year', '').strip()
     offset = int(request.query.get('offset', 0))
-
-    # Clean the TMDB title: remove non-alphanumeric chars so it works as a filename search
+  
+    search_terms = [query]
     compact_query = re.sub(r"[^A-Za-z0-9 ]+", " ", query).strip()
+    if compact_query and compact_query not in search_terms:
+        search_terms.append(compact_query)
+    for word in compact_query.split():
+        if len(word) >= 4 and word.lower() not in {"the", "and", "with", "from"}:
+            search_terms.append(word)
 
     found = {}
-
-    # ── STAGE 1: Delta-style multi-word regex (primary path) ──────────────
-    # e.g. "The Dark Knight" → regex `the.*[\s._-]dark.*[\s._-]knight`
-    # This is exactly how Delta's ia_filterdb handles multi-word queries.
-    for file in await get_search_results(compact_query):
-        found[file["_id"]] = file
-
-    # If original query differs (has special chars like colons, dashes), try it too
-    if query != compact_query:
-        for file in await get_search_results(query):
+    for term in search_terms:
+        for file in await get_search_results(term):
             found[file["_id"]] = file
-
-    # ── STAGE 2: Try without leading article (Delta fallback) ─────────────
-    # "The Dark Knight" → try "Dark Knight" too
-    no_article = re.sub(r"^(?:the|a|an)\s+", "", compact_query, flags=re.IGNORECASE).strip()
-    if no_article and no_article != compact_query:
-        for file in await get_search_results(no_article):
-            found[file["_id"]] = file
-
-    # ── STAGE 3: Word-level fallback ONLY if multi-word search found nothing ──
-    # (avoids the noise of pulling in unrelated files just because they share a word)
-    if not found:
-        skip_words = {"the", "a", "an", "and", "with", "from", "of", "in", "at", "to"}
-        meaningful_words = [
-            w for w in compact_query.split()
-            if len(w) >= 4 and w.lower() not in skip_words
-        ]
-        # Only use the longest/most-distinctive word (less noise)
-        if meaningful_words:
-            best_word = max(meaningful_words, key=len)
-            for file in await get_search_results(best_word):
-                found[file["_id"]] = file
-
-    # ── STAGE 4: Full-scan fuzzy fallback (last resort) ───────────────────
-    if not found and len(compact_query) >= 3:
-        target_norm = normalize_title(compact_query)
+    if not found and len(compact_query) >= 4:
         for file in await get_search_results(""):
             model = file_model(file)
-            if best_title_similarity(model, target_norm) >= 0.65:
+            if fuzzy_ratio(model["title"], compact_query) >= 0.68:
                 found[file["_id"]] = file
 
-    # ── RANK & FILTER ─────────────────────────────────────────────────────
-    # Minimum score of 0.40 — the improved match_file_to_tmdb does the heavy
-    # lifting, so we keep a low threshold here and let scoring do the work.
     ranked_files = [
         model for model in (
             match_file_to_tmdb(file, query, year=year, media_type=media_type)
             for file in found.values()
         )
-        if model["match_score"] >= 0.40
+        if model["match_score"] >= 0.42
     ]
-
     ranked_files.sort(key=lambda f: (
-        # TV/Anime: sort by season → episode → score
         f.get("season") if isinstance(f.get("season"), int) else 999,
         f.get("episode") if isinstance(f.get("episode"), int) else 999,
         -f["match_score"],
@@ -749,7 +716,7 @@ async def api_search_handler(request):
 
     total_results = len(ranked_files)
     files, next_offset, _ = await handle_next_back(ranked_files, offset=offset, max_results=MAX_BTN * 5)
-
+    
     return web.json_response({
         "files": files,
         "next_offset": next_offset if next_offset != 0 else None,
