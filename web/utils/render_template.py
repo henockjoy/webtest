@@ -455,7 +455,6 @@ webapp_template = """
             white-space: nowrap;
         }
         .watch-pill { background: var(--accent); }
-        .watch-pill:hover { background: #ff0f1b; }
         .download-pill { background: var(--card2); border: 1px solid var(--border); }
         .modal-poster {
             width: 64px; height: 95px; border-radius: var(--radius-sm);
@@ -810,7 +809,7 @@ webapp_template = """
         }
         @keyframes pulse2 { 50% { opacity: .35; box-shadow: none; } }
 
-        /* ── RECENTLY ADDED ROW ── */
+        /* ── LIVE BADGE ── */
         .live-badge {
             display: inline-flex; align-items: center; gap: 5px;
             background: rgba(229,9,20,.14); border: 1px solid rgba(229,9,20,.32);
@@ -824,6 +823,93 @@ webapp_template = """
             animation: pulse2 1.6s cubic-bezier(.4,0,.6,1) infinite;
             flex-shrink: 0;
         }
+
+        /* ── STREAM OVERLAY ── */
+        .stream-overlay {
+            position: fixed; inset: 0; z-index: 400;
+            background: rgba(5,5,10,0.97); backdrop-filter: blur(24px);
+            display: flex; flex-direction: column;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .stream-overlay.open { opacity: 1; visibility: visible; }
+        .stream-overlay-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: calc(env(safe-area-inset-top,0px) + 14px) 16px 12px;
+            background: rgba(10,10,15,0.95); border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .stream-back-btn {
+            width: 36px; height: 36px; background: var(--card2); border: 1px solid var(--border);
+            border-radius: 50%; cursor: pointer; color: var(--text2);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: background 0.2s, color 0.2s;
+        }
+        .stream-back-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .stream-overlay-title {
+            flex: 1; font-size: 14px; font-weight: 700; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .stream-overlay-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.3);
+            color: var(--accent); font-size: 10px; font-weight: 800;
+            padding: 4px 10px; border-radius: 20px; flex-shrink: 0; letter-spacing: 0.5px;
+        }
+        .stream-iframe-wrap {
+            flex: 1; position: relative; overflow: hidden;
+            background: #000;
+        }
+        .stream-iframe-wrap iframe {
+            position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+        }
+        .stream-loading-overlay {
+            position: absolute; inset: 0; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #050508; gap: 14px;
+        }
+        .stream-loading-overlay .spinner { width: 36px; height: 36px; }
+        .stream-loading-overlay p { font-size: 13px; color: var(--text3); }
+
+        /* ── MODAL ACTION BUTTONS ── */
+        .detail-action-bar {
+            display: none; gap: 10px;
+            padding: 16px 20px 4px; flex-direction: column;
+        }
+        .detail-action-bar.show { display: flex; }
+        .detail-action-title {
+            font-size: 11px; color: var(--text3); text-transform: uppercase;
+            letter-spacing: 1px; font-weight: 800; margin-bottom: 4px;
+        }
+        .detail-action-row { display: flex; gap: 10px; }
+        .btn-watch-online {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: linear-gradient(135deg, var(--accent), #ff4444);
+            color: #fff; border: none; border-radius: 12px;
+            padding: 14px 16px; font-family: 'Outfit', sans-serif;
+            font-size: 14px; font-weight: 800; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            box-shadow: 0 4px 20px rgba(229,9,20,0.4);
+            transition: transform 0.15s, box-shadow 0.25s, filter 0.2s;
+        }
+        .btn-watch-online:hover { filter: brightness(1.1); box-shadow: 0 6px 28px rgba(229,9,20,0.55); }
+        .btn-watch-online:active { transform: scale(0.97); }
+        .btn-download-file {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: var(--card2); color: var(--text2); border: 1.5px solid var(--border);
+            border-radius: 12px; padding: 14px 16px;
+            font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
+        }
+        .btn-download-file:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.2); }
+        .btn-download-file:active { transform: scale(0.97); }
+        .selected-file-info {
+            background: rgba(229,9,20,0.07); border: 1px solid rgba(229,9,20,0.2);
+            border-radius: 10px; padding: 10px 14px;
+            font-size: 12px; color: var(--text2); line-height: 1.4;
+        }
+        .selected-file-info strong { color: #fff; font-weight: 700; }
 
         /* ── TODAY RELEASED SECTION ── */
         .today-released-section { margin: 0 0 32px; }
@@ -945,16 +1031,10 @@ webapp_template = """
         <div class="hero-title" id="heroTitle">Loading...</div>
         <div class="hero-meta" id="heroMeta"></div>
         <div class="hero-overview" id="heroOverview"></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <button class="hero-btn" id="heroWatchBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                Watch Online
-            </button>
-            <button class="hero-btn" id="heroBtn" style="background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);box-shadow:none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Get Files
-            </button>
-        </div>
+        <button class="hero-btn" id="heroBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Get Files
+        </button>
         <div class="hero-dots" id="heroDots"></div>
     </div>
 </section>
@@ -981,31 +1061,6 @@ webapp_template = """
             <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
             <div class="skel skel-poster"></div>
         </div>
-    </section>
-
-    <!-- ── RECENTLY ADDED (bot database) ── -->
-    <section class="row-section fade-up" id="recentlyAddedSection">
-        <div class="row-header">
-            <div class="row-title" style="display:flex;align-items:center;gap:8px">
-                <span></span>Recently Added
-                <div class="live-badge"><span class="live-dot"></span>New</div>
-            </div>
-        </div>
-        <div class="poster-scroll" id="rowRecentlyAdded">
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
-            <div class="skel skel-poster"></div>
-        </div>
-    </section>
-
-    <!-- ── RECENTLY VIEWED (localStorage) ── -->
-    <section class="row-section fade-up" id="recentlyViewedSection" style="display:none">
-        <div class="row-header">
-            <div class="row-title" style="display:flex;align-items:center;gap:8px">
-                <span></span>Recently Viewed
-            </div>
-        </div>
-        <div class="poster-scroll" id="rowRecentlyViewed"></div>
     </section>
 
     <!-- Trending Row -->
@@ -1104,6 +1159,21 @@ webapp_template = """
         <div class="detail-section" id="detailCast"></div>
         <div class="detail-section" id="detailImages"></div>
         <div class="detail-section" id="detailQuotes"></div>
+        <!-- ACTION BUTTONS (shown after description, when file is selected) -->
+        <div class="detail-action-bar" id="detailActionBar">
+            <div class="detail-action-title">Actions</div>
+            <div class="selected-file-info" id="selectedFileInfo"></div>
+            <div class="detail-action-row">
+                <button class="btn-watch-online" id="btnWatchOnline" type="button" onclick="handleWatchOnline()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                    Watch Online
+                </button>
+                <button class="btn-download-file" id="btnDownload" type="button" onclick="handleDownload()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                </button>
+            </div>
+        </div>
         <div class="modal-divider"></div>
         <div class="modal-files-label">Available Files</div>
         <div class="file-search-wrap">
@@ -1113,13 +1183,24 @@ webapp_template = """
         <div class="file-search-count" id="fileSearchCount"></div>
         <div class="modal-files" id="modalFiles"></div>
         </div>
-        <div class="file-action-bar" id="fileActionBar">
-            <div class="selected-file-name" id="selectedFileName"></div>
-            <a class="action-pill watch-pill" id="watchAction" target="_blank" rel="noopener">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                Watch Online
-            </a>
-            <button class="action-pill download-pill" id="downloadAction" type="button">Download</button>
+    </div>
+</div>
+
+<!-- STREAMING OVERLAY -->
+<div class="stream-overlay" id="streamOverlay">
+    <div class="stream-overlay-header">
+        <button class="stream-back-btn" onclick="closeStreamOverlay()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="stream-overlay-title" id="streamOverlayTitle">Streaming</div>
+        <div class="stream-overlay-badge">
+            <span class="live-dot"></span>LIVE
+        </div>
+    </div>
+    <div class="stream-iframe-wrap" id="streamIframeWrap">
+        <div class="stream-loading-overlay" id="streamLoadingOverlay">
+            <div class="spinner"></div>
+            <p>Loading stream...</p>
         </div>
     </div>
 </div>
@@ -1210,13 +1291,6 @@ function setHero(item) {
         <span style="text-transform:capitalize">${typeLabel(item.type)}</span>
     `;
     btn.onclick = () => openModal(item);
-    const watchBtn = document.getElementById('heroWatchBtn');
-    if (watchBtn) {
-        const heroSlug = makeSlug(item.title || '');
-        const heroType = item.type === 'anime' ? 'tv' : (item.type || 'movie');
-        const heroPlayerUrl = `https://multimoviesapis.vercel.app/api/player/${heroSlug}?type=${heroType}&title=${encodeURIComponent(item.title || '')}`;
-        watchBtn.onclick = () => window.open(heroPlayerUrl, '_blank', 'noopener');
-    }
 }
 
 function updateDots() {
@@ -1263,9 +1337,6 @@ function renderRow(containerId, items) {
 
 // ── LOAD HOME ─────────────────────────────────────────────────────────────
 async function loadHome() {
-    // 0. Show recently viewed immediately (no network needed)
-    renderRecentlyViewed();
-
     // 1. Check repair mode first
     try {
         const rs = await fetch('/api/repair-status');
@@ -1315,9 +1386,8 @@ async function loadHome() {
         });
     }
 
-    // 3. Load today-airing + recently-added in background — won't block main rows
+    // 3. Load today-airing in background — won't block main rows
     loadTodayReleased(trendingMovies);
-    loadRecentlyAdded();
 }
 
 async function loadTodayReleased(trendingMovies) {
@@ -1343,55 +1413,6 @@ async function loadTodayReleased(trendingMovies) {
     }
 }
 
-let _recentlyAddedIds = new Set();
-
-async function loadRecentlyAdded() {
-    try {
-        const resp  = await fetch('/api/recently-added');
-        const data  = await resp.json();
-        const files = data.files || [];
-        if (files.length > 0) {
-            files.forEach(f => _recentlyAddedIds.add(f.id));
-            renderRecentlyAdded(files);
-            enableDragScroll(document.getElementById('rowRecentlyAdded'));
-        } else {
-            const sec = document.getElementById('recentlyAddedSection');
-            if (sec) sec.style.display = 'none';
-        }
-    } catch(e) {
-        console.error('Recently added load failed:', e);
-        const sec = document.getElementById('recentlyAddedSection');
-        if (sec) sec.style.display = 'none';
-    }
-    // Poll every 30 seconds for new files
-    setTimeout(pollRecentlyAdded, 30000);
-}
-
-async function pollRecentlyAdded() {
-    try {
-        const resp = await fetch('/api/recently-added?limit=10');
-        const data = await resp.json();
-        const files = (data.files || []).filter(f => !_recentlyAddedIds.has(f.id));
-        if (files.length > 0) {
-            files.forEach(f => _recentlyAddedIds.add(f.id));
-            const row = document.getElementById('rowRecentlyAdded');
-            if (row) {
-                // Prepend new cards with a highlight
-                const tmp = document.createElement('div');
-                renderRecentlyAddedInto(tmp, files);
-                Array.from(tmp.children).reverse().forEach(card => {
-                    card.style.outline = '2px solid var(--accent)';
-                    card.style.outlineOffset = '2px';
-                    row.prepend(card);
-                    setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 4000);
-                });
-                const sec = document.getElementById('recentlyAddedSection');
-                if (sec) sec.style.display = '';
-            }
-        }
-    } catch(e) {}
-    setTimeout(pollRecentlyAdded, 30000);
-}
 
 // ── TODAY RELEASED ROW ────────────────────────────────────────────────────
 function renderTodayReleasedRow(filter) {
@@ -1446,95 +1467,7 @@ function filterTodayReleased(filter) {
     renderTodayReleasedRow(filter);
 }
 
-// ── RECENTLY ADDED ROW ────────────────────────────────────────────────────
-function renderRecentlyAdded(files) {
-    const el = document.getElementById('rowRecentlyAdded');
-    el.innerHTML = '';
-    files.forEach((file, i) => {
-        const card = document.createElement('div');
-        card.className = 'poster-card';
-        card.style.animationDelay = `${i * 0.03}s`;
-        const posterSrc = file.poster || null;
-        const posterHTML = posterSrc
-            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="imgError(this)">`
-            : `<div class="poster-placeholder">🎬</div>`;
-        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
-        let epText = '';
-        if (file.season != null && file.episode != null)
-            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
-        else if (file.season != null)
-            epText = `S${String(file.season).padStart(2,'0')}`;
-        const badgeText = epText || typeStr;
-        const ratingVal = file.rating || 0;
-        card.innerHTML = `
-            <div class="poster-img-wrap">
-                ${posterHTML}
-                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
-                <div class="poster-type-badge">${badgeText}</div>
-            </div>
-            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
-            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
-        `;
-        card.onclick = () => {
-            if (file.tmdb_id || (file.type && file.poster)) {
-                openModal({
-                    id: file.tmdb_id,
-                    source: 'tmdb',
-                    title: file.title || file.name,
-                    type: file.type || 'movie',
-                    year: file.year || '',
-                    rating: ratingVal,
-                    poster: posterSrc,
-                    overview: file.overview || '',
-                });
-            } else {
-                // No TMDB data — go direct to watch/download via file ID
-                selectFileById(file);
-            }
-        };
-        el.appendChild(card);
-    });
-}
-
-function renderRecentlyAddedInto(container, files) {
-    files.forEach((file, i) => {
-        const card = document.createElement('div');
-        card.className = 'poster-card fade-up';
-        card.style.animationDelay = `${i * 0.03}s`;
-        const posterSrc = file.poster || null;
-        const posterHTML = posterSrc
-            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="imgError(this)">`
-            : `<div class="poster-placeholder">🎬</div>`;
-        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
-        let epText = '';
-        if (file.season != null && file.episode != null)
-            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
-        else if (file.season != null)
-            epText = `S${String(file.season).padStart(2,'0')}`;
-        const badgeText = epText || typeStr;
-        const ratingVal = file.rating || 0;
-        card.innerHTML = `
-            <div class="poster-img-wrap">
-                ${posterHTML}
-                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
-                <div class="poster-type-badge">${badgeText}</div>
-            </div>
-            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
-            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
-        `;
-        card.onclick = () => {
-            if (file.tmdb_id || (file.type && file.poster)) {
-                openModal({ id: file.tmdb_id, source: 'tmdb', title: file.title || file.name, type: file.type || 'movie', year: file.year || '', rating: ratingVal, poster: posterSrc, overview: file.overview || '' });
-            } else {
-                selectFileById(file);
-            }
-        };
-        container.appendChild(card);
-    });
-}
-
 function selectFileById(file) {
-    // Show a toast and open download directly
     showToast(`Opening: ${file.name}`);
     window.open(`/api/stream-file/${file.id}`, '_blank');
 }
@@ -1543,17 +1476,11 @@ function selectFileById(file) {
 let searchTimer = null;
 
 function openSearch() {
-    if (!document.getElementById('searchOverlay').classList.contains('open')) {
-        history.pushState({ navType: 'search' }, '');
-        _navDepth++;
-        _updateTgBackBtn();
-    }
     document.getElementById('searchOverlay').classList.add('open');
     setTimeout(() => document.getElementById('searchField').focus(), 300);
 }
 
 function closeSearch() {
-    if (!document.getElementById('searchOverlay').classList.contains('open')) return;
     document.getElementById('searchOverlay').classList.remove('open');
     document.getElementById('searchField').value = '';
     document.getElementById('searchResultsGrid').innerHTML = `
@@ -1561,8 +1488,6 @@ function closeSearch() {
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Search for movies, TV shows and anime
         </div>`;
-    if (!_skipHistoryBack && _navDepth > 0) { _navDepth--; history.back(); }
-    _updateTgBackBtn();
 }
 
 // Close search on Escape
@@ -1572,11 +1497,8 @@ document.getElementById('searchField').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     const q = e.target.value.trim();
     if (!q) {
-        document.getElementById('searchResultsGrid').innerHTML = `
-            <div class="search-hint" style="grid-column:1/-1">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                Search for movies, TV shows and anime
-            </div>`;
+        closeSearch();
+        openSearch();
         return;
     }
     document.getElementById('searchResultsGrid').innerHTML = `
@@ -1637,20 +1559,85 @@ async function doSearch(q) {
     }
 }
 
+// ── STREAMING OVERLAY ─────────────────────────────────────────────────────
+const MOVIESAPI_BASE = 'http://moviesapi.proyato.com';
+
+function buildStreamUrl(item, file) {
+    const tmdbId = item.id || item.tmdb_id;
+    const type = item.type || 'movie';
+    if (tmdbId && (type === 'movie')) {
+        return `${MOVIESAPI_BASE}/movie/${tmdbId}`;
+    }
+    if (tmdbId && (type === 'tv' || type === 'anime')) {
+        const season = (file && file.season != null) ? file.season : 1;
+        const episode = (file && file.episode != null) ? file.episode : 1;
+        return `${MOVIESAPI_BASE}/tv/${tmdbId}-${season}-${episode}`;
+    }
+    // Fallback: use bot stream
+    if (file) return `/api/stream-file/${file.id}`;
+    return null;
+}
+
+function openStreamOverlay(url, title) {
+    const overlay = document.getElementById('streamOverlay');
+    const titleEl = document.getElementById('streamOverlayTitle');
+    const wrap = document.getElementById('streamIframeWrap');
+    const loading = document.getElementById('streamLoadingOverlay');
+    titleEl.textContent = title || 'Streaming';
+    wrap.innerHTML = `
+        <div class="stream-loading-overlay" id="streamLoadingOverlay">
+            <div class="spinner"></div>
+            <p>Loading stream...</p>
+        </div>`;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+    iframe.allowFullscreen = true;
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.onload = () => {
+        const lo = document.getElementById('streamLoadingOverlay');
+        if (lo) lo.style.display = 'none';
+    };
+    wrap.appendChild(iframe);
+}
+
+function closeStreamOverlay() {
+    const overlay = document.getElementById('streamOverlay');
+    overlay.classList.remove('open');
+    document.getElementById('streamIframeWrap').innerHTML = '';
+    document.body.style.overflow = '';
+}
+
+function handleWatchOnline() {
+    if (!currentItem) return;
+    const url = buildStreamUrl(currentItem, selectedFile);
+    if (!url) { showToast('No stream available'); return; }
+    const label = selectedFile
+        ? `${currentItem.title} ${selectedFile.season != null ? `S${String(selectedFile.season).padStart(2,'0')}E${String(selectedFile.episode || 1).padStart(2,'0')}` : ''}`
+        : currentItem.title;
+    openStreamOverlay(url, label);
+}
+
+function handleDownload() {
+    if (!selectedFile) {
+        showToast('Select a file first');
+        const filesEl = document.getElementById('modalFiles');
+        if (filesEl) filesEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    getFile(selectedFile.id);
+}
+
 // ── MODAL ─────────────────────────────────────────────────────────────────
 let currentItem = null;
 let selectedFile = null;
 
 async function openModal(item) {
     currentItem = item;
-    rvPush(item);
-    if (!document.getElementById('modalBackdrop').classList.contains('open')) {
-        history.pushState({ navType: 'modal' }, '');
-        _navDepth++;
-        _updateTgBackBtn();
-    }
     selectedFile = null;
-    hideFileActions();
+    hideDetailActions();
     resetDetailSections();
     document.getElementById('detailMedia').innerHTML = item.backdrop
         ? `<img src="${item.backdrop}" alt="${escapeHTML(item.title)} backdrop">`
@@ -1688,16 +1675,7 @@ async function openModal(item) {
         </div>
         ${genrePills}
         ${item.overview ? `<div class="modal-overview">${item.overview}</div>` : ''}
-        <div style="margin-top:12px">
-            <button class="action-pill watch-pill" style="font-size:12px;padding:9px 14px" id="modalWatchOnlineBtn">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                Watch Online
-            </button>
-        </div>
     `;
-    // Wire Watch Online button to use currentItem
-    const mwoBtn = document.getElementById('modalWatchOnlineBtn');
-    if (mwoBtn) mwoBtn.onclick = () => watchItemOnline(currentItem);
     // Show modal
     document.getElementById('modalBackdrop').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -1705,119 +1683,15 @@ async function openModal(item) {
 }
 
 function closeModal() {
-    if (!document.getElementById('modalBackdrop').classList.contains('open')) return;
     document.getElementById('modalBackdrop').classList.remove('open');
     document.body.style.overflow = '';
     currentItem = null;
     selectedFile = null;
-    hideFileActions();
-    if (!_skipHistoryBack && _navDepth > 0) { _navDepth--; history.back(); }
-    _updateTgBackBtn();
+    hideDetailActions();
 }
 
 function handleBackdropClick(e) {
     if (e.target === document.getElementById('modalBackdrop')) closeModal();
-}
-
-// ── NAVIGATION STATE (back button) ────────────────────────────────────────
-let _navDepth = 0;
-let _skipHistoryBack = false;
-
-function _updateTgBackBtn() {
-    try {
-        if (!tg || !tg.BackButton) return;
-        if (_navDepth > 0) {
-            tg.BackButton.show();
-        } else {
-            tg.BackButton.hide();
-        }
-    } catch(e) {}
-}
-
-// Telegram native back button
-try {
-    if (tg && tg.BackButton) {
-        tg.BackButton.onClick(() => {
-            if (document.getElementById('modalBackdrop').classList.contains('open')) {
-                closeModal();
-            } else if (document.getElementById('searchOverlay').classList.contains('open')) {
-                closeSearch();
-            }
-        });
-    }
-} catch(e) {}
-
-// Browser back button / Android hardware back
-window.addEventListener('popstate', () => {
-    _skipHistoryBack = true;
-    if (document.getElementById('modalBackdrop').classList.contains('open')) {
-        if (_navDepth > 0) _navDepth--;
-        closeModal();
-    } else if (document.getElementById('searchOverlay').classList.contains('open')) {
-        if (_navDepth > 0) _navDepth--;
-        closeSearch();
-    }
-    _skipHistoryBack = false;
-    _updateTgBackBtn();
-});
-
-// ── RECENTLY VIEWED ────────────────────────────────────────────────────────
-const _RV_KEY = 'rv_items';
-const _RV_MAX = 12;
-
-function rvLoad() {
-    try { return JSON.parse(localStorage.getItem(_RV_KEY) || '[]'); } catch(e) { return []; }
-}
-
-function rvSave(arr) {
-    try { localStorage.setItem(_RV_KEY, JSON.stringify(arr)); } catch(e) {}
-}
-
-function rvPush(item) {
-    if (!item || !item.title) return;
-    const safe = {
-        id: item.id, source: item.source || 'tmdb',
-        title: item.title, type: item.type || 'movie',
-        year: item.year || '', rating: item.rating || 0,
-        poster: item.poster || '', overview: item.overview || '',
-        backdrop: item.backdrop || '', genres: item.genres || []
-    };
-    let arr = rvLoad().filter(x => !(String(x.id) === String(safe.id) && x.source === safe.source));
-    arr.unshift(safe);
-    if (arr.length > _RV_MAX) arr = arr.slice(0, _RV_MAX);
-    rvSave(arr);
-    renderRecentlyViewed();
-}
-
-function renderRecentlyViewed() {
-    const arr = rvLoad();
-    const sec = document.getElementById('recentlyViewedSection');
-    const row = document.getElementById('rowRecentlyViewed');
-    if (!sec || !row) return;
-    if (!arr.length) { sec.style.display = 'none'; return; }
-    sec.style.display = '';
-    row.innerHTML = '';
-    arr.forEach((item, i) => {
-        const card = document.createElement('div');
-        card.className = 'poster-card';
-        card.style.animationDelay = `${Math.min(i * 0.04, 0.5)}s`;
-        const typeStr = item.type === 'tv' ? 'TV' : (item.type === 'anime' ? 'Anime' : 'Movie');
-        const posterHTML = item.poster
-            ? `<img class="poster-img" src="${escapeHTML(item.poster)}" alt="${escapeHTML(item.title)}" loading="lazy" onerror="imgError(this)">`
-            : `<div class="poster-placeholder">🎬</div>`;
-        card.innerHTML = `
-            <div class="poster-img-wrap">
-                ${posterHTML}
-                ${item.rating > 0 ? `<div class="poster-rating">⭐ ${item.rating}</div>` : ''}
-                <div class="poster-type-badge">${typeStr}</div>
-            </div>
-            <div class="poster-title">${escapeHTML(item.title)}</div>
-            ${item.year ? `<div class="poster-year">${item.year}</div>` : ''}
-        `;
-        card.onclick = () => openModal(item);
-        row.appendChild(card);
-    });
-    enableDragScroll(row);
 }
 
 function escapeHTML(value) {
@@ -1836,6 +1710,28 @@ function resetDetailSections() {
     ['detailSources', 'detailStats', 'detailCast', 'detailImages', 'detailQuotes'].forEach(id => {
         document.getElementById(id).innerHTML = '';
     });
+    hideDetailActions();
+}
+
+function hideDetailActions() {
+    const bar = document.getElementById('detailActionBar');
+    if (bar) bar.classList.remove('show');
+    const info = document.getElementById('selectedFileInfo');
+    if (info) info.innerHTML = '';
+}
+
+function showDetailActions(file) {
+    const bar = document.getElementById('detailActionBar');
+    const info = document.getElementById('selectedFileInfo');
+    if (!bar) return;
+    let epLabel = '';
+    if (file.season != null && file.episode != null)
+        epLabel = ` · S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
+    else if (file.season != null)
+        epLabel = ` · Season ${file.season}`;
+    if (info) info.innerHTML = `<strong>${escapeHTML(file.name)}</strong><br>${escapeHTML(file.size)}${epLabel}`;
+    bar.classList.add('show');
+    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderDetailMedia(details) {
@@ -1948,6 +1844,15 @@ async function loadDetailsForItem(item) {
         renderPeople(currentItem);
         renderImages(currentItem);
         renderQuotes(currentItem);
+        // For movies with a TMDB ID, show Watch Online immediately (no file selection needed)
+        if ((currentItem.type === 'movie') && (currentItem.id || currentItem.tmdb_id) && !selectedFile) {
+            const bar = document.getElementById('detailActionBar');
+            const info = document.getElementById('selectedFileInfo');
+            if (bar && info) {
+                info.innerHTML = `<strong>${escapeHTML(currentItem.title)}</strong><br>Stream via moviesapi — or select a file below to download`;
+                bar.classList.add('show');
+            }
+        }
     } catch(e) {
         renderDetailMedia(item);
         document.getElementById('detailStats').innerHTML = `<div class="modal-empty-sub" style="padding:0 0 10px">Extra details could not be loaded. Showing available info.</div>`;
@@ -2185,56 +2090,12 @@ async function loadFilesForItem(item) {
     }
 }
 
-function watchItemOnline(item) {
-    const url = makePlayerUrl(item, null);
-    window.open(url, '_blank', 'noopener');
-}
-
-function makeSlug(title) {
-    return (title || '').toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-');
-}
-
-function makePlayerUrl(item, file) {
-    const title = (item && item.title) || (file && file.name) || '';
-    const rawType = (item && item.type) || (file && file.season != null ? 'tv' : 'movie');
-    const type = rawType === 'anime' ? 'tv' : rawType;
-    const slug = makeSlug(title);
-    let url = `https://multimoviesapis.vercel.app/api/player/${slug}?type=${type}&title=${encodeURIComponent(title)}`;
-    if (type === 'tv') {
-        const season = (file && file.season != null) ? file.season : 1;
-        const episode = (file && file.episode != null) ? file.episode : 1;
-        url += `&season=${season}&episode=${episode}`;
-    }
-    return url;
-}
-
 function selectFile(file, el) {
     selectedFile = file;
     document.querySelectorAll('.file-item.selected').forEach(x => x.classList.remove('selected'));
     el.classList.add('selected');
-    document.getElementById('selectedFileName').textContent = `${file.name} (${file.size})`;
-    // Build internal stream URL with episode metadata for the watch page
-    const title   = (currentItem && currentItem.title) || '';
-    const type    = (currentItem && currentItem.type)  || 'movie';
-    const season  = (file.season  != null) ? file.season  : '';
-    const episode = (file.episode != null) ? file.episode : '';
-    const params  = new URLSearchParams({ title, type });
-    if (season  !== '') params.set('season',  season);
-    if (episode !== '') params.set('episode', episode);
-    document.getElementById('watchAction').href = `/api/stream-file/${file.id}?${params.toString()}`;
-    document.getElementById('downloadAction').onclick = () => getFile(file.id);
-    document.getElementById('fileActionBar').classList.add('show');
-    showToast('File selected — click Watch Online to stream');
-}
-
-function hideFileActions() {
-    document.getElementById('fileActionBar').classList.remove('show');
-    document.getElementById('selectedFileName').textContent = '';
-    document.getElementById('watchAction').removeAttribute('href');
+    showDetailActions(file);
+    showToast('File selected — scroll up to watch or download');
 }
 
 function getFile(fileId) {
@@ -2500,33 +2361,6 @@ watch_tmplt = """<!DOCTYPE html>
         footer{padding:.8rem 1.5rem;text-align:center;color:var(--txt2);font-size:.72rem;margin-top:auto}
         .ha-link{color:var(--accent);text-decoration:none;font-weight:600}
 
-        /* ── Episode / Season panel ── */
-        .ep-section{width:100%;margin-top:.9rem}
-        .ep-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem}
-        .ep-title-label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2)}
-        .ep-toggle-btn{background:none;border:1px solid var(--border);color:var(--txt2);border-radius:7px;padding:.28rem .65rem;font-size:.7rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:background .15s,color .15s}
-        .ep-toggle-btn:hover{background:var(--card2);color:#fff}
-        .s-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.55rem}
-        .s-tab{padding:.38rem .82rem;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--txt2);font-size:.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:background .15s,color .15s,border-color .15s}
-        .s-tab:hover{background:var(--card2);color:#fff}
-        .s-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-        .ep-list{display:flex;flex-direction:column;gap:.3rem;max-height:300px;overflow-y:auto;padding-right:.15rem}
-        .ep-list::-webkit-scrollbar{width:3px}
-        .ep-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-        .ep-item{display:flex;align-items:center;gap:.65rem;padding:.6rem .75rem;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:background .15s,border-color .15s;user-select:none}
-        .ep-item:hover{background:var(--card2);border-color:rgba(14,165,233,.3)}
-        .ep-item.ep-active{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.45);cursor:default}
-        .ep-item.ep-loading{opacity:.55;pointer-events:none}
-        .ep-badge{flex-shrink:0;font-size:.66rem;font-weight:800;color:var(--accent);background:rgba(14,165,233,.1);padding:.22rem .48rem;border-radius:5px;min-width:42px;text-align:center;letter-spacing:.02em}
-        .ep-item.ep-active .ep-badge{background:rgba(14,165,233,.22)}
-        .ep-info{flex:1;min-width:0}
-        .ep-name{font-size:.76rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .ep-meta{font-size:.66rem;color:var(--txt2);margin-top:.12rem}
-        .ep-icon{flex-shrink:0;color:var(--accent)}
-        .ep-msg{padding:1.2rem;text-align:center;font-size:.78rem}
-        .ep-msg.ep-err{color:#f87171}
-        .ep-msg.ep-info{color:var(--txt2)}
-
         @media(max-width:600px){
             .container{padding:1rem .75rem 2rem}
             .track-row,.seek-row{grid-template-columns:1fr 1fr}
@@ -2590,20 +2424,6 @@ watch_tmplt = """<!DOCTYPE html>
                 <select class="track-select" id="subSelect">
                     <option value="off">Off</option>
                 </select>
-            </div>
-        </div>
-
-        <!-- Season / Episode panel (shown for TV & anime) -->
-        <div class="ep-section" id="epSection" style="display:none">
-            <div class="ep-header">
-                <span class="ep-title-label" id="epTitleLabel">Episodes</span>
-                <button class="ep-toggle-btn" id="epToggleBtn" onclick="epToggle()">Hide</button>
-            </div>
-            <div id="epBody">
-                <div class="s-tabs" id="sTabs"></div>
-                <div class="ep-list" id="epList">
-                    <div class="ep-msg ep-info">Loading episodes...</div>
-                </div>
             </div>
         </div>
 
@@ -2770,172 +2590,6 @@ watch_tmplt = """<!DOCTYPE html>
             showErr();
         }
     }, 25000);
-})();
-
-/* ── Episode / Season panel ─────────────────────────────────────────────── */
-(function() {
-    var SHOW_TITLE  = "{show_title}";   // URL-encoded show title
-    var MEDIA_TYPE  = "{media_type}";   // tv / anime / movie
-    var CUR_SEASON  = {cur_season};     // integer (0 = unknown)
-    var CUR_EPISODE = {cur_episode};    // integer (0 = unknown)
-    var CUR_FILE_ID = "{cur_file_id}";  // URL-encoded file_id of current episode
-
-    if (MEDIA_TYPE !== "tv" && MEDIA_TYPE !== "anime") return;
-    if (!SHOW_TITLE) return;
-
-    var _epFiles = [], _epSeasonMap = {}, _epActiveSeason = 0, _epVisible = true;
-
-    document.getElementById("epSection").style.display = "";
-
-    window.epToggle = function() {
-        _epVisible = !_epVisible;
-        document.getElementById("epBody").style.display = _epVisible ? "" : "none";
-        document.getElementById("epToggleBtn").textContent = _epVisible ? "Hide" : "Show";
-    };
-
-    function escH(s) {
-        return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-
-    function fetchPage(url, acc, done, fail) {
-        fetch(url)
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                acc = acc.concat(d.files || []);
-                if (d.next_offset && acc.length < 300) {
-                    var next = "/api/search?q=" + SHOW_TITLE + "&type=" + encodeURIComponent(MEDIA_TYPE) + "&offset=" + d.next_offset;
-                    fetchPage(next, acc, done, fail);
-                } else {
-                    done(acc);
-                }
-            })
-            .catch(function() {
-                if (acc.length > 0) done(acc); else fail();
-            });
-    }
-
-    fetchPage(
-        "/api/search?q=" + SHOW_TITLE + "&type=" + encodeURIComponent(MEDIA_TYPE) + "&offset=0",
-        [],
-        function(files) { _epFiles = files; epBuildPanel(); },
-        function() { document.getElementById("epList").innerHTML = '<div class="ep-msg ep-err">Could not load episodes.</div>'; }
-    );
-
-    function epBuildPanel() {
-        _epSeasonMap = {};
-        _epFiles.forEach(function(f) {
-            var s = (f.season != null && f.season !== undefined) ? Number(f.season) : 0;
-            if (!_epSeasonMap[s]) _epSeasonMap[s] = [];
-            _epSeasonMap[s].push(f);
-        });
-        var keys = Object.keys(_epSeasonMap).map(Number).sort(function(a,b){ return a - b; });
-        if (!keys.length) {
-            document.getElementById("epList").innerHTML = '<div class="ep-msg ep-info">No episodes found.</div>';
-            return;
-        }
-        document.getElementById("epTitleLabel").textContent = "Episodes (" + _epFiles.length + ")";
-        _epActiveSeason = (CUR_SEASON && _epSeasonMap[CUR_SEASON]) ? CUR_SEASON : keys[0];
-
-        var tabsEl = document.getElementById("sTabs");
-        tabsEl.innerHTML = "";
-        if (keys.length > 1) {
-            keys.forEach(function(s) {
-                var btn = document.createElement("button");
-                btn.className = "s-tab" + (s === _epActiveSeason ? " active" : "");
-                btn.textContent = s === 0 ? "Other" : ("S" + (s < 10 ? "0" + s : "" + s));
-                btn._s = s;
-                btn.onclick = function() { epSwitchSeason(this._s); };
-                tabsEl.appendChild(btn);
-            });
-        }
-        epRenderList(_epSeasonMap[_epActiveSeason] || []);
-    }
-
-    function epSwitchSeason(s) {
-        _epActiveSeason = s;
-        document.querySelectorAll(".s-tab").forEach(function(b) { b.classList.toggle("active", b._s === s); });
-        epRenderList(_epSeasonMap[s] || []);
-    }
-    window.epSwitchSeason = epSwitchSeason;
-
-    function epRenderList(files) {
-        var listEl = document.getElementById("epList");
-        if (!files.length) {
-            listEl.innerHTML = '<div class="ep-msg ep-info">No episodes in this season.</div>';
-            return;
-        }
-        var sorted = files.slice().sort(function(a, b) {
-            var ea = (a.episode != null) ? Number(a.episode) : 9999;
-            var eb = (b.episode != null) ? Number(b.episode) : 9999;
-            return ea - eb || String(a.name || "").localeCompare(String(b.name || ""));
-        });
-        listEl.innerHTML = "";
-        sorted.forEach(function(f) {
-            var fid = String(f.id || "");
-            var curFidDecoded = "";
-            try { curFidDecoded = decodeURIComponent(CUR_FILE_ID); } catch(e) { curFidDecoded = CUR_FILE_ID; }
-            var isActive = curFidDecoded
-                ? fid === curFidDecoded
-                : (CUR_SEASON && CUR_EPISODE && Number(f.season) === CUR_SEASON && Number(f.episode) === CUR_EPISODE);
-
-            var sn = (f.season  != null) ? Number(f.season)  : null;
-            var en = (f.episode != null) ? Number(f.episode) : null;
-            var badge = sn != null && en != null
-                ? "S" + (sn < 10 ? "0"+sn : sn) + "E" + (en < 10 ? "0"+en : en)
-                : en != null ? "Ep " + en
-                : sn != null ? "S"  + (sn < 10 ? "0"+sn : sn)
-                : "—";
-
-            var item = document.createElement("div");
-            item.className = "ep-item" + (isActive ? " ep-active" : "");
-            item.innerHTML =
-                '<span class="ep-badge">' + escH(badge) + "</span>" +
-                '<div class="ep-info">' +
-                    '<div class="ep-name">' + escH(f.name || "") + "</div>" +
-                    '<div class="ep-meta">' + escH(f.size || "") + "</div>" +
-                "</div>" +
-                (isActive
-                    ? '<svg class="ep-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>'
-                    : '<svg class="ep-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
-                );
-
-            if (!isActive) {
-                (function(file, el) {
-                    el.onclick = function() { epLoad(file, el); };
-                })(f, item);
-            }
-            listEl.appendChild(item);
-        });
-
-        var activeEl = listEl.querySelector(".ep-active");
-        if (activeEl) setTimeout(function() { activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 150);
-    }
-
-    function epLoad(file, el) {
-        document.querySelectorAll(".ep-item").forEach(function(i) { i.classList.remove("ep-loading"); });
-        el.classList.add("ep-loading");
-        var s  = (file.season  != null) ? Number(file.season)  : 0;
-        var ep = (file.episode != null) ? Number(file.episode) : 0;
-        var fid = String(file.id || "");
-        var qs = "?title=" + SHOW_TITLE +
-                 "&type="  + encodeURIComponent(MEDIA_TYPE) +
-                 "&season=" + s + "&episode=" + ep +
-                 "&file_id=" + encodeURIComponent(fid);
-        fetch("/api/resolve-file/" + encodeURIComponent(fid))
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.error) {
-                    el.classList.remove("ep-loading");
-                    alert("Could not load episode: " + d.error);
-                    return;
-                }
-                window.location.href = "/watch/" + d.message_id + qs;
-            })
-            .catch(function() {
-                el.classList.remove("ep-loading");
-                alert("Network error. Please try again.");
-            });
-    }
 })();
 </script>
 </body>
