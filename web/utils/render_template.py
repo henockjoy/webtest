@@ -456,6 +456,96 @@ webapp_template = """
         }
         .watch-pill { background: var(--accent); }
         .download-pill { background: var(--card2); border: 1px solid var(--border); }
+
+        /* ── WATCH ONLINE BUTTON ── */
+        .watch-online-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: var(--accent); color: #fff;
+            padding: 11px 18px; border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 800;
+            border: none; cursor: pointer; margin-top: 12px; width: 100%;
+            box-shadow: 0 4px 14px rgba(229,9,20,0.3);
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            letter-spacing: 0.3px; text-transform: uppercase;
+        }
+        .watch-online-btn:hover { background: var(--accent2); box-shadow: 0 6px 20px rgba(229,9,20,0.45); }
+        .watch-online-btn:active { transform: scale(0.97); }
+
+        /* ── STREAM PANEL ── */
+        .stream-panel {
+            position: fixed; inset: 0; z-index: 500;
+            background: rgba(0,0,0,0.92); backdrop-filter: blur(20px);
+            display: flex; align-items: flex-end; justify-content: center;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .stream-panel.open { opacity: 1; visibility: visible; }
+        .stream-sheet {
+            background: var(--card); border-radius: 20px 20px 0 0;
+            width: 100%; max-width: 780px; max-height: 85vh;
+            display: flex; flex-direction: column;
+            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            overflow: hidden;
+        }
+        .stream-panel.open .stream-sheet { transform: translateY(0); }
+        .stream-sheet-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        .stream-sheet-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        .stream-sheet-close {
+            width: 32px; height: 32px; background: var(--card2);
+            border: none; border-radius: 50%; cursor: pointer; color: var(--text2);
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .stream-sheet-close:hover { background: var(--border); color: #fff; transform: rotate(90deg); }
+        .stream-content { overflow-y: auto; flex: 1; padding: 16px 20px 40px; }
+        .stream-source-card {
+            background: var(--card2); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px;
+        }
+        .stream-source-title {
+            font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .stream-field {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px;
+            font-size: 12px; color: var(--text2); align-items: baseline;
+        }
+        .stream-field b { color: var(--text); min-width: 70px; }
+        .stream-field-val { color: var(--text2); word-break: break-all; }
+        .stream-badge {
+            display: inline-block; background: rgba(229,9,20,0.15);
+            border: 1px solid rgba(229,9,20,0.3); color: var(--accent);
+            font-size: 10px; font-weight: 700; padding: 2px 8px;
+            border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .stream-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .stream-play-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--accent); color: #fff;
+            padding: 9px 16px; border-radius: 8px;
+            font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 800;
+            border: none; cursor: pointer; text-decoration: none;
+            transition: background 0.2s, transform 0.15s;
+        }
+        .stream-play-btn:hover { background: var(--accent2); }
+        .stream-play-btn:active { transform: scale(0.97); }
+        .stream-link-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: var(--card); border: 1px solid var(--border); color: var(--text2);
+            padding: 8px 14px; border-radius: 8px;
+            font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700;
+            text-decoration: none; transition: background 0.2s, color 0.2s;
+        }
+        .stream-link-btn:hover { background: var(--card2); color: #fff; }
+        .stream-loading { text-align: center; padding: 50px 20px; color: var(--text3); font-size: 14px; }
+        .stream-empty { text-align: center; padding: 50px 20px; color: var(--text3); }
+        .stream-empty-icon { font-size: 40px; margin-bottom: 12px; }
+        .stream-empty-title { font-size: 16px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+        .stream-empty-sub { font-size: 13px; color: var(--text3); line-height: 1.5; }
+        .stream-handle { width: 36px; height: 4px; background: var(--text3); border-radius: 2px; margin: 14px auto 0; flex-shrink: 0; }
         .modal-poster {
             width: 64px; height: 95px; border-radius: var(--radius-sm);
             object-fit: cover; flex-shrink: 0; background: var(--card2);
@@ -809,7 +899,7 @@ webapp_template = """
         }
         @keyframes pulse2 { 50% { opacity: .35; box-shadow: none; } }
 
-        /* ── LIVE BADGE ── */
+        /* ── RECENTLY ADDED ROW ── */
         .live-badge {
             display: inline-flex; align-items: center; gap: 5px;
             background: rgba(229,9,20,.14); border: 1px solid rgba(229,9,20,.32);
@@ -823,93 +913,6 @@ webapp_template = """
             animation: pulse2 1.6s cubic-bezier(.4,0,.6,1) infinite;
             flex-shrink: 0;
         }
-
-        /* ── STREAM OVERLAY ── */
-        .stream-overlay {
-            position: fixed; inset: 0; z-index: 400;
-            background: rgba(5,5,10,0.97); backdrop-filter: blur(24px);
-            display: flex; flex-direction: column;
-            opacity: 0; visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        .stream-overlay.open { opacity: 1; visibility: visible; }
-        .stream-overlay-header {
-            display: flex; align-items: center; gap: 12px;
-            padding: calc(env(safe-area-inset-top,0px) + 14px) 16px 12px;
-            background: rgba(10,10,15,0.95); border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        .stream-back-btn {
-            width: 36px; height: 36px; background: var(--card2); border: 1px solid var(--border);
-            border-radius: 50%; cursor: pointer; color: var(--text2);
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0; transition: background 0.2s, color 0.2s;
-        }
-        .stream-back-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .stream-overlay-title {
-            flex: 1; font-size: 14px; font-weight: 700; color: #fff;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .stream-overlay-badge {
-            display: inline-flex; align-items: center; gap: 5px;
-            background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.3);
-            color: var(--accent); font-size: 10px; font-weight: 800;
-            padding: 4px 10px; border-radius: 20px; flex-shrink: 0; letter-spacing: 0.5px;
-        }
-        .stream-iframe-wrap {
-            flex: 1; position: relative; overflow: hidden;
-            background: #000;
-        }
-        .stream-iframe-wrap iframe {
-            position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
-        }
-        .stream-loading-overlay {
-            position: absolute; inset: 0; z-index: 2;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #050508; gap: 14px;
-        }
-        .stream-loading-overlay .spinner { width: 36px; height: 36px; }
-        .stream-loading-overlay p { font-size: 13px; color: var(--text3); }
-
-        /* ── MODAL ACTION BUTTONS ── */
-        .detail-action-bar {
-            display: none; gap: 10px;
-            padding: 16px 20px 4px; flex-direction: column;
-        }
-        .detail-action-bar.show { display: flex; }
-        .detail-action-title {
-            font-size: 11px; color: var(--text3); text-transform: uppercase;
-            letter-spacing: 1px; font-weight: 800; margin-bottom: 4px;
-        }
-        .detail-action-row { display: flex; gap: 10px; }
-        .btn-watch-online {
-            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
-            background: linear-gradient(135deg, var(--accent), #ff4444);
-            color: #fff; border: none; border-radius: 12px;
-            padding: 14px 16px; font-family: 'Outfit', sans-serif;
-            font-size: 14px; font-weight: 800; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            box-shadow: 0 4px 20px rgba(229,9,20,0.4);
-            transition: transform 0.15s, box-shadow 0.25s, filter 0.2s;
-        }
-        .btn-watch-online:hover { filter: brightness(1.1); box-shadow: 0 6px 28px rgba(229,9,20,0.55); }
-        .btn-watch-online:active { transform: scale(0.97); }
-        .btn-download-file {
-            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
-            background: var(--card2); color: var(--text2); border: 1.5px solid var(--border);
-            border-radius: 12px; padding: 14px 16px;
-            font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; cursor: pointer;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
-        }
-        .btn-download-file:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.2); }
-        .btn-download-file:active { transform: scale(0.97); }
-        .selected-file-info {
-            background: rgba(229,9,20,0.07); border: 1px solid rgba(229,9,20,0.2);
-            border-radius: 10px; padding: 10px 14px;
-            font-size: 12px; color: var(--text2); line-height: 1.4;
-        }
-        .selected-file-info strong { color: #fff; font-weight: 700; }
 
         /* ── TODAY RELEASED SECTION ── */
         .today-released-section { margin: 0 0 32px; }
@@ -1063,6 +1066,21 @@ webapp_template = """
         </div>
     </section>
 
+    <!-- ── RECENTLY ADDED (bot database) ── -->
+    <section class="row-section fade-up" id="recentlyAddedSection">
+        <div class="row-header">
+            <div class="row-title" style="display:flex;align-items:center;gap:8px">
+                <span></span>Recently Added
+                <div class="live-badge"><span class="live-dot"></span>New</div>
+            </div>
+        </div>
+        <div class="poster-scroll" id="rowRecentlyAdded">
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div><div class="skel skel-poster"></div>
+            <div class="skel skel-poster"></div>
+        </div>
+    </section>
+
     <!-- Trending Row -->
     <section class="row-section fade-up">
         <div class="row-header">
@@ -1159,21 +1177,6 @@ webapp_template = """
         <div class="detail-section" id="detailCast"></div>
         <div class="detail-section" id="detailImages"></div>
         <div class="detail-section" id="detailQuotes"></div>
-        <!-- ACTION BUTTONS (shown after description, when file is selected) -->
-        <div class="detail-action-bar" id="detailActionBar">
-            <div class="detail-action-title">Actions</div>
-            <div class="selected-file-info" id="selectedFileInfo"></div>
-            <div class="detail-action-row">
-                <button class="btn-watch-online" id="btnWatchOnline" type="button" onclick="handleWatchOnline()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                    Watch Online
-                </button>
-                <button class="btn-download-file" id="btnDownload" type="button" onclick="handleDownload()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Download
-                </button>
-            </div>
-        </div>
         <div class="modal-divider"></div>
         <div class="modal-files-label">Available Files</div>
         <div class="file-search-wrap">
@@ -1183,24 +1186,29 @@ webapp_template = """
         <div class="file-search-count" id="fileSearchCount"></div>
         <div class="modal-files" id="modalFiles"></div>
         </div>
+        <div class="file-action-bar" id="fileActionBar">
+            <div class="selected-file-name" id="selectedFileName"></div>
+            <a class="action-pill watch-pill" id="watchAction" target="_blank" rel="noopener">Watch</a>
+            <button class="action-pill download-pill" id="downloadAction" type="button">Download</button>
+        </div>
     </div>
 </div>
 
-<!-- STREAMING OVERLAY -->
-<div class="stream-overlay" id="streamOverlay">
-    <div class="stream-overlay-header">
-        <button class="stream-back-btn" onclick="closeStreamOverlay()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-        </button>
-        <div class="stream-overlay-title" id="streamOverlayTitle">Streaming</div>
-        <div class="stream-overlay-badge">
-            <span class="live-dot"></span>LIVE
+<!-- STREAM PANEL -->
+<div class="stream-panel" id="streamPanel" onclick="handleStreamBackdropClick(event)">
+    <div class="stream-sheet" id="streamSheet">
+        <div class="stream-handle"></div>
+        <div class="stream-sheet-header">
+            <div class="stream-sheet-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Watch Online
+            </div>
+            <button class="stream-sheet-close" onclick="closeStreamPanel()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
         </div>
-    </div>
-    <div class="stream-iframe-wrap" id="streamIframeWrap">
-        <div class="stream-loading-overlay" id="streamLoadingOverlay">
-            <div class="spinner"></div>
-            <p>Loading stream...</p>
+        <div class="stream-content" id="streamContent">
+            <div class="stream-loading"><div class="spinner"></div> Searching streams...</div>
         </div>
     </div>
 </div>
@@ -1386,8 +1394,9 @@ async function loadHome() {
         });
     }
 
-    // 3. Load today-airing in background — won't block main rows
+    // 3. Load today-airing + recently-added in background — won't block main rows
     loadTodayReleased(trendingMovies);
+    loadRecentlyAdded();
 }
 
 async function loadTodayReleased(trendingMovies) {
@@ -1413,6 +1422,55 @@ async function loadTodayReleased(trendingMovies) {
     }
 }
 
+let _recentlyAddedIds = new Set();
+
+async function loadRecentlyAdded() {
+    try {
+        const resp  = await fetch('/api/recently-added');
+        const data  = await resp.json();
+        const files = data.files || [];
+        if (files.length > 0) {
+            files.forEach(f => _recentlyAddedIds.add(f.id));
+            renderRecentlyAdded(files);
+            enableDragScroll(document.getElementById('rowRecentlyAdded'));
+        } else {
+            const sec = document.getElementById('recentlyAddedSection');
+            if (sec) sec.style.display = 'none';
+        }
+    } catch(e) {
+        console.error('Recently added load failed:', e);
+        const sec = document.getElementById('recentlyAddedSection');
+        if (sec) sec.style.display = 'none';
+    }
+    // Poll every 30 seconds for new files
+    setTimeout(pollRecentlyAdded, 30000);
+}
+
+async function pollRecentlyAdded() {
+    try {
+        const resp = await fetch('/api/recently-added?limit=10');
+        const data = await resp.json();
+        const files = (data.files || []).filter(f => !_recentlyAddedIds.has(f.id));
+        if (files.length > 0) {
+            files.forEach(f => _recentlyAddedIds.add(f.id));
+            const row = document.getElementById('rowRecentlyAdded');
+            if (row) {
+                // Prepend new cards with a highlight
+                const tmp = document.createElement('div');
+                renderRecentlyAddedInto(tmp, files);
+                Array.from(tmp.children).reverse().forEach(card => {
+                    card.style.outline = '2px solid var(--accent)';
+                    card.style.outlineOffset = '2px';
+                    row.prepend(card);
+                    setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 4000);
+                });
+                const sec = document.getElementById('recentlyAddedSection');
+                if (sec) sec.style.display = '';
+            }
+        }
+    } catch(e) {}
+    setTimeout(pollRecentlyAdded, 30000);
+}
 
 // ── TODAY RELEASED ROW ────────────────────────────────────────────────────
 function renderTodayReleasedRow(filter) {
@@ -1467,7 +1525,95 @@ function filterTodayReleased(filter) {
     renderTodayReleasedRow(filter);
 }
 
+// ── RECENTLY ADDED ROW ────────────────────────────────────────────────────
+function renderRecentlyAdded(files) {
+    const el = document.getElementById('rowRecentlyAdded');
+    el.innerHTML = '';
+    files.forEach((file, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card';
+        card.style.animationDelay = `${i * 0.03}s`;
+        const posterSrc = file.poster || null;
+        const posterHTML = posterSrc
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="imgError(this)">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
+        let epText = '';
+        if (file.season != null && file.episode != null)
+            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
+        else if (file.season != null)
+            epText = `S${String(file.season).padStart(2,'0')}`;
+        const badgeText = epText || typeStr;
+        const ratingVal = file.rating || 0;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
+                <div class="poster-type-badge">${badgeText}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
+            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
+        `;
+        card.onclick = () => {
+            if (file.tmdb_id || (file.type && file.poster)) {
+                openModal({
+                    id: file.tmdb_id,
+                    source: 'tmdb',
+                    title: file.title || file.name,
+                    type: file.type || 'movie',
+                    year: file.year || '',
+                    rating: ratingVal,
+                    poster: posterSrc,
+                    overview: file.overview || '',
+                });
+            } else {
+                // No TMDB data — go direct to watch/download via file ID
+                selectFileById(file);
+            }
+        };
+        el.appendChild(card);
+    });
+}
+
+function renderRecentlyAddedInto(container, files) {
+    files.forEach((file, i) => {
+        const card = document.createElement('div');
+        card.className = 'poster-card fade-up';
+        card.style.animationDelay = `${i * 0.03}s`;
+        const posterSrc = file.poster || null;
+        const posterHTML = posterSrc
+            ? `<img class="poster-img" src="${posterSrc}" alt="${escapeHTML(file.title || file.name)}" loading="lazy" onerror="imgError(this)">`
+            : `<div class="poster-placeholder">🎬</div>`;
+        let typeStr = file.type === 'tv' ? 'TV' : (file.type === 'anime' ? 'Anime' : 'Movie');
+        let epText = '';
+        if (file.season != null && file.episode != null)
+            epText = `S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
+        else if (file.season != null)
+            epText = `S${String(file.season).padStart(2,'0')}`;
+        const badgeText = epText || typeStr;
+        const ratingVal = file.rating || 0;
+        card.innerHTML = `
+            <div class="poster-img-wrap">
+                ${posterHTML}
+                ${ratingVal > 0 ? `<div class="poster-rating">⭐ ${ratingVal}</div>` : ''}
+                <div class="poster-type-badge">${badgeText}</div>
+            </div>
+            <div class="poster-title">${escapeHTML(file.title || file.name)}</div>
+            ${file.year ? `<div class="poster-year">${file.year}</div>` : ''}
+        `;
+        card.onclick = () => {
+            if (file.tmdb_id || (file.type && file.poster)) {
+                openModal({ id: file.tmdb_id, source: 'tmdb', title: file.title || file.name, type: file.type || 'movie', year: file.year || '', rating: ratingVal, poster: posterSrc, overview: file.overview || '' });
+            } else {
+                selectFileById(file);
+            }
+        };
+        container.appendChild(card);
+    });
+}
+
 function selectFileById(file) {
+    // Show a toast and open download directly
     showToast(`Opening: ${file.name}`);
     window.open(`/api/stream-file/${file.id}`, '_blank');
 }
@@ -1559,77 +1705,6 @@ async function doSearch(q) {
     }
 }
 
-// ── STREAMING OVERLAY ─────────────────────────────────────────────────────
-const MOVIESAPI_BASE = 'http://moviesapi.proyato.com';
-
-function buildStreamUrl(item, file) {
-    const tmdbId = item.id || item.tmdb_id;
-    const type = item.type || 'movie';
-    if (tmdbId && (type === 'movie')) {
-        return `${MOVIESAPI_BASE}/movie/${tmdbId}`;
-    }
-    if (tmdbId && (type === 'tv' || type === 'anime')) {
-        const season = (file && file.season != null) ? file.season : 1;
-        const episode = (file && file.episode != null) ? file.episode : 1;
-        return `${MOVIESAPI_BASE}/tv/${tmdbId}-${season}-${episode}`;
-    }
-    // Fallback: use bot stream
-    if (file) return `/api/stream-file/${file.id}`;
-    return null;
-}
-
-function openStreamOverlay(url, title) {
-    const overlay = document.getElementById('streamOverlay');
-    const titleEl = document.getElementById('streamOverlayTitle');
-    const wrap = document.getElementById('streamIframeWrap');
-    const loading = document.getElementById('streamLoadingOverlay');
-    titleEl.textContent = title || 'Streaming';
-    wrap.innerHTML = `
-        <div class="stream-loading-overlay" id="streamLoadingOverlay">
-            <div class="spinner"></div>
-            <p>Loading stream...</p>
-        </div>`;
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-    const iframe = document.createElement('iframe');
-    iframe.src = url;
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
-    iframe.allowFullscreen = true;
-    iframe.setAttribute('allowfullscreen', '');
-    iframe.onload = () => {
-        const lo = document.getElementById('streamLoadingOverlay');
-        if (lo) lo.style.display = 'none';
-    };
-    wrap.appendChild(iframe);
-}
-
-function closeStreamOverlay() {
-    const overlay = document.getElementById('streamOverlay');
-    overlay.classList.remove('open');
-    document.getElementById('streamIframeWrap').innerHTML = '';
-    document.body.style.overflow = '';
-}
-
-function handleWatchOnline() {
-    if (!currentItem) return;
-    const url = buildStreamUrl(currentItem, selectedFile);
-    if (!url) { showToast('No stream available'); return; }
-    const label = selectedFile
-        ? `${currentItem.title} ${selectedFile.season != null ? `S${String(selectedFile.season).padStart(2,'0')}E${String(selectedFile.episode || 1).padStart(2,'0')}` : ''}`
-        : currentItem.title;
-    openStreamOverlay(url, label);
-}
-
-function handleDownload() {
-    if (!selectedFile) {
-        showToast('Select a file first');
-        const filesEl = document.getElementById('modalFiles');
-        if (filesEl) filesEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        return;
-    }
-    getFile(selectedFile.id);
-}
-
 // ── MODAL ─────────────────────────────────────────────────────────────────
 let currentItem = null;
 let selectedFile = null;
@@ -1637,7 +1712,7 @@ let selectedFile = null;
 async function openModal(item) {
     currentItem = item;
     selectedFile = null;
-    hideDetailActions();
+    hideFileActions();
     resetDetailSections();
     document.getElementById('detailMedia').innerHTML = item.backdrop
         ? `<img src="${item.backdrop}" alt="${escapeHTML(item.title)} backdrop">`
@@ -1675,6 +1750,10 @@ async function openModal(item) {
         </div>
         ${genrePills}
         ${item.overview ? `<div class="modal-overview">${item.overview}</div>` : ''}
+        <button class="watch-online-btn" onclick="openWatchOnline()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Watch Online
+        </button>
     `;
     // Show modal
     document.getElementById('modalBackdrop').classList.add('open');
@@ -1687,7 +1766,7 @@ function closeModal() {
     document.body.style.overflow = '';
     currentItem = null;
     selectedFile = null;
-    hideDetailActions();
+    hideFileActions();
 }
 
 function handleBackdropClick(e) {
@@ -1710,28 +1789,6 @@ function resetDetailSections() {
     ['detailSources', 'detailStats', 'detailCast', 'detailImages', 'detailQuotes'].forEach(id => {
         document.getElementById(id).innerHTML = '';
     });
-    hideDetailActions();
-}
-
-function hideDetailActions() {
-    const bar = document.getElementById('detailActionBar');
-    if (bar) bar.classList.remove('show');
-    const info = document.getElementById('selectedFileInfo');
-    if (info) info.innerHTML = '';
-}
-
-function showDetailActions(file) {
-    const bar = document.getElementById('detailActionBar');
-    const info = document.getElementById('selectedFileInfo');
-    if (!bar) return;
-    let epLabel = '';
-    if (file.season != null && file.episode != null)
-        epLabel = ` · S${String(file.season).padStart(2,'0')}E${String(file.episode).padStart(2,'0')}`;
-    else if (file.season != null)
-        epLabel = ` · Season ${file.season}`;
-    if (info) info.innerHTML = `<strong>${escapeHTML(file.name)}</strong><br>${escapeHTML(file.size)}${epLabel}`;
-    bar.classList.add('show');
-    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderDetailMedia(details) {
@@ -1844,15 +1901,6 @@ async function loadDetailsForItem(item) {
         renderPeople(currentItem);
         renderImages(currentItem);
         renderQuotes(currentItem);
-        // For movies with a TMDB ID, show Watch Online immediately (no file selection needed)
-        if ((currentItem.type === 'movie') && (currentItem.id || currentItem.tmdb_id) && !selectedFile) {
-            const bar = document.getElementById('detailActionBar');
-            const info = document.getElementById('selectedFileInfo');
-            if (bar && info) {
-                info.innerHTML = `<strong>${escapeHTML(currentItem.title)}</strong><br>Stream via moviesapi — or select a file below to download`;
-                bar.classList.add('show');
-            }
-        }
     } catch(e) {
         renderDetailMedia(item);
         document.getElementById('detailStats').innerHTML = `<div class="modal-empty-sub" style="padding:0 0 10px">Extra details could not be loaded. Showing available info.</div>`;
@@ -2094,8 +2142,136 @@ function selectFile(file, el) {
     selectedFile = file;
     document.querySelectorAll('.file-item.selected').forEach(x => x.classList.remove('selected'));
     el.classList.add('selected');
-    showDetailActions(file);
-    showToast('File selected — scroll up to watch or download');
+    document.getElementById('selectedFileName').textContent = `${file.name} (${file.size})`;
+    document.getElementById('watchAction').href = `/api/stream-file/${file.id}`;
+    document.getElementById('downloadAction').onclick = () => getFile(file.id);
+    document.getElementById('fileActionBar').classList.add('show');
+    showToast('File selected');
+}
+
+function hideFileActions() {
+    document.getElementById('fileActionBar').classList.remove('show');
+    document.getElementById('selectedFileName').textContent = '';
+    document.getElementById('watchAction').removeAttribute('href');
+}
+
+// ── WATCH ONLINE / STREAM PANEL ───────────────────────────────────────────
+async function openWatchOnline() {
+    if (!currentItem) return;
+    document.getElementById('streamPanel').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    const content = document.getElementById('streamContent');
+    content.innerHTML = '<div class="stream-loading"><div class="spinner"></div> Searching streams...</div>';
+    try {
+        const params = new URLSearchParams({
+            title: currentItem.title || '',
+            year: currentItem.year || '',
+            type: currentItem.type || 'movie',
+            id: String(currentItem.id || '')
+        });
+        const resp = await fetch(`/api/watch-online?${params.toString()}`);
+        const data = await resp.json();
+        renderStreamResults(data, currentItem.title);
+    } catch(e) {
+        content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">⚠️</div><div class="stream-empty-title">Could not load streams</div><div class="stream-empty-sub">Please try again later.</div></div>`;
+    }
+}
+
+function closeStreamPanel() {
+    document.getElementById('streamPanel').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function handleStreamBackdropClick(e) {
+    if (e.target === document.getElementById('streamPanel')) closeStreamPanel();
+}
+
+function renderStreamResults(data, title) {
+    const content = document.getElementById('streamContent');
+    if (!data) {
+        content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">📭</div><div class="stream-empty-title">No streams found</div><div class="stream-empty-sub">No online streams available for "<b>${escapeHTML(title || '')}</b>" right now.</div></div>`;
+        return;
+    }
+
+    // Normalise: the API can return an array, or an object with a results/streams key
+    let items = [];
+    if (Array.isArray(data)) {
+        items = data;
+    } else if (data.results) {
+        items = Array.isArray(data.results) ? data.results : [data.results];
+    } else if (data.streams) {
+        items = Array.isArray(data.streams) ? data.streams : [data.streams];
+    } else if (data.links) {
+        items = Array.isArray(data.links) ? data.links : [data.links];
+    } else if (typeof data === 'object' && Object.keys(data).length > 0) {
+        items = [data];
+    }
+
+    if (!items.length) {
+        content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">📭</div><div class="stream-empty-title">No streams found</div><div class="stream-empty-sub">No online streams available for "<b>${escapeHTML(title || '')}</b>" right now.</div></div>`;
+        return;
+    }
+
+    content.innerHTML = '';
+
+    items.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'stream-source-card';
+
+        const streamName = item.title || item.name || item.source || item.provider || `Stream ${idx + 1}`;
+        let fieldsHtml = '';
+        const actions = [];
+
+        const URL_KEYS = new Set(['url','link','stream','stream_url','video','video_url','file','file_url','hls','hls_url','m3u8','embed','iframe','player','watch','direct','download','download_url','src','source']);
+        const BADGE_KEYS = new Set(['quality','resolution','type','format','codec','lang','language','audio','subtitle','season','episode','size','bitrate']);
+
+        Object.entries(item).forEach(([key, value]) => {
+            if (value === null || value === undefined || value === '') return;
+            const lk = key.toLowerCase().replace(/[_\-\s]+/g, '_');
+            const label = key.replace(/[_\-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+            if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('//'))) {
+                if (URL_KEYS.has(lk) || lk.includes('url') || lk.includes('link') || lk.includes('stream') || lk.includes('video') || lk.includes('file') || lk.includes('embed') || lk.includes('player') || lk.includes('download') || lk.includes('src')) {
+                    actions.push(`<a class="stream-play-btn" href="${escapeHTML(value)}" target="_blank" rel="noopener">▶ ${escapeHTML(label)}</a>`);
+                } else {
+                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val"><a href="${escapeHTML(value)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHTML(value.length > 60 ? value.slice(0, 60) + '…' : value)}</a></span></div>`;
+                }
+            } else if (typeof value === 'string' || typeof value === 'number') {
+                const sval = String(value);
+                if (BADGE_KEYS.has(lk)) {
+                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-badge">${escapeHTML(sval)}</span></div>`;
+                } else {
+                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val">${escapeHTML(sval)}</span></div>`;
+                }
+            } else if (Array.isArray(value) && value.length > 0) {
+                const vals = value.map(v => {
+                    if (typeof v === 'string' && v.startsWith('http')) return `<a href="${escapeHTML(v)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHTML(v.length > 40 ? v.slice(0,40)+'…' : v)}</a>`;
+                    return escapeHTML(String(v));
+                });
+                fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val">${vals.join(', ')}</span></div>`;
+            } else if (typeof value === 'object') {
+                Object.entries(value).forEach(([k2, v2]) => {
+                    if (!v2) return;
+                    const l2 = (key + ' ' + k2).replace(/[_\-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    if (typeof v2 === 'string' && v2.startsWith('http')) {
+                        actions.push(`<a class="stream-play-btn" href="${escapeHTML(v2)}" target="_blank" rel="noopener">▶ ${escapeHTML(l2)}</a>`);
+                    } else {
+                        fieldsHtml += `<div class="stream-field"><b>${escapeHTML(l2)}:</b><span class="stream-field-val">${escapeHTML(String(v2))}</span></div>`;
+                    }
+                });
+            }
+        });
+
+        card.innerHTML = `
+            <div class="stream-source-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                ${escapeHTML(streamName)}
+            </div>
+            ${fieldsHtml}
+            ${actions.length ? `<div class="stream-actions">${actions.join('')}</div>` : ''}
+        `;
+        content.appendChild(card);
+    });
 }
 
 function getFile(fileId) {
