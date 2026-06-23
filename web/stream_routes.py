@@ -545,7 +545,7 @@ async def tracks_handler(request):
     except Exception as e:
         return web.json_response({"audio": [], "subtitles": [], "error": str(e)})
 
-MULTIMOVIES_API = "https://multimoviesapis.vercel.app/api"
+MULTIMOVIES_API = "https://moviesapi.proyato.com/api"
 
 @routes.get("/api/watch-online")
 async def watch_online_handler(request):
