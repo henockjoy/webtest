@@ -960,6 +960,85 @@ webapp_template = """
             .hero-overview { max-width: 52%; font-size: 15px; }
             .search-results-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
         }
+
+        /* ── EPISODE GRID SELECTOR ── */
+        .episode-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .episode-grid-btn {
+            background: var(--card2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 12px 0;
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
+        }
+        .episode-grid-btn:hover {
+            background: rgba(229, 9, 20, 0.15);
+            border-color: rgba(229, 9, 20, 0.4);
+            color: #fff;
+            transform: scale(1.05);
+        }
+        .episode-grid-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* ── MOVIE PLAY CARD ── */
+        .movie-play-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, rgba(22,22,31,0.95) 0%, rgba(30,30,42,0.95) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            text-align: center;
+            margin-top: 12px;
+        }
+        .movie-play-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .movie-play-meta {
+            font-size: 13px;
+            color: var(--text2);
+            margin-bottom: 24px;
+        }
+        .movie-play-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--accent);
+            color: #fff;
+            padding: 14px 28px;
+            border-radius: var(--radius);
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 800;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 14px rgba(229,9,20,0.4);
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+        }
+        .movie-play-btn:hover {
+            background: var(--accent2);
+            box-shadow: 0 6px 20px rgba(229,9,20,0.6);
+        }
+        .movie-play-btn:active {
+            transform: scale(0.97);
+        }
     </style>
 </head>
 <body>
@@ -2156,12 +2235,20 @@ function hideFileActions() {
 }
 
 // ── WATCH ONLINE / STREAM PANEL ───────────────────────────────────────────
+function slugify(title) {
+    return title.toLowerCase().trim()
+        .replace(/[^a-z0-9\\s-]/g, '')
+        .replace(/\\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 async function openWatchOnline() {
     if (!currentItem) return;
     document.getElementById('streamPanel').classList.add('open');
     document.body.style.overflow = 'hidden';
     const content = document.getElementById('streamContent');
-    content.innerHTML = '<div class="stream-loading"><div class="spinner"></div> Searching streams...</div>';
+    content.innerHTML = '<div class="stream-loading"><div class="spinner"></div> Resolving player...</div>';
     try {
         const params = new URLSearchParams({
             title: currentItem.title || '',
@@ -2171,9 +2258,103 @@ async function openWatchOnline() {
         });
         const resp = await fetch(`/api/watch-online?${params.toString()}`);
         const data = await resp.json();
-        renderStreamResults(data, currentItem.title);
+        const slug = data.slug || slugify(currentItem.title);
+        
+        if (currentItem.type === 'movie') {
+            renderMoviePlayCard(slug);
+        } else {
+            // Ensure seasons are loaded
+            if (!currentItem.seasons || currentItem.seasons.length === 0) {
+                const detailsParams = new URLSearchParams({
+                    source: currentItem.source || 'tmdb',
+                    type: currentItem.type || 'tv',
+                    id: currentItem.id
+                });
+                const detailsResp = await fetch(`/api/media-details?${detailsParams.toString()}`);
+                const details = await detailsResp.json();
+                currentItem = {...currentItem, ...details};
+            }
+            renderTVSelector(slug);
+        }
     } catch(e) {
         content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">⚠️</div><div class="stream-empty-title">Could not load streams</div><div class="stream-empty-sub">Please try again later.</div></div>`;
+    }
+}
+
+function renderMoviePlayCard(slug) {
+    const content = document.getElementById('streamContent');
+    const playerUrl = `https://multimoviesapis.vercel.app/api/player/${slug}?type=movie&title=${encodeURIComponent(currentItem.title)}`;
+    content.innerHTML = `
+        <div class="movie-play-card fade-up">
+            <div class="movie-play-title">${escapeHTML(currentItem.title)}</div>
+            <div class="movie-play-meta">${currentItem.year ? currentItem.year + ' · ' : ''}${currentItem.rating ? '⭐ ' + currentItem.rating : ''}</div>
+            <a class="movie-play-btn" href="${playerUrl}" target="_blank" rel="noopener" onclick="closeStreamPanel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right:8px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Play Movie
+            </a>
+        </div>
+    `;
+}
+
+function renderTVSelector(slug) {
+    const content = document.getElementById('streamContent');
+    content.innerHTML = '';
+    
+    const seasons = currentItem.seasons || [];
+    if (!seasons.length) {
+        content.innerHTML = `
+            <div class="stream-empty">
+                <div class="stream-empty-icon">📭</div>
+                <div class="stream-empty-title">No seasons found</div>
+                <div class="stream-empty-sub">Could not load season details for this show.</div>
+            </div>`;
+        return;
+    }
+    
+    const strip = document.createElement('div');
+    strip.className = 'season-strip';
+    
+    const epGrid = document.createElement('div');
+    epGrid.className = 'episode-grid fade-up';
+    
+    function drawSeason(seasonNum, episodeCount) {
+        strip.querySelectorAll('.season-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.season === String(seasonNum));
+        });
+        
+        epGrid.innerHTML = '';
+        for (let ep = 1; ep <= episodeCount; ep++) {
+            const btn = document.createElement('button');
+            btn.className = 'episode-grid-btn';
+            btn.textContent = ep;
+            const playerUrl = `https://multimoviesapis.vercel.app/api/player/${slug}?type=tv&season=${seasonNum}&episode=${ep}&title=${encodeURIComponent(currentItem.title)}`;
+            btn.onclick = () => {
+                window.open(playerUrl, '_blank');
+                closeStreamPanel();
+            };
+            epGrid.appendChild(btn);
+        }
+    }
+    
+    seasons.forEach((s, idx) => {
+        if (s.season_number === 0 && seasons.length > 1) return;
+        
+        const btn = document.createElement('button');
+        btn.className = 'season-btn' + (idx === 0 || (seasons[0].season_number === 0 && idx === 1) ? ' active' : '');
+        btn.dataset.season = String(s.season_number);
+        btn.textContent = `Season ${s.season_number}`;
+        btn.onclick = () => {
+            drawSeason(s.season_number, s.episode_count);
+        };
+        strip.appendChild(btn);
+    });
+    
+    content.appendChild(strip);
+    content.appendChild(epGrid);
+    
+    const initialSeason = seasons.find(s => s.season_number > 0) || seasons[0];
+    if (initialSeason) {
+        drawSeason(initialSeason.season_number, initialSeason.episode_count);
     }
 }
 
@@ -2184,94 +2365,6 @@ function closeStreamPanel() {
 
 function handleStreamBackdropClick(e) {
     if (e.target === document.getElementById('streamPanel')) closeStreamPanel();
-}
-
-function renderStreamResults(data, title) {
-    const content = document.getElementById('streamContent');
-    if (!data) {
-        content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">📭</div><div class="stream-empty-title">No streams found</div><div class="stream-empty-sub">No online streams available for "<b>${escapeHTML(title || '')}</b>" right now.</div></div>`;
-        return;
-    }
-
-    // Normalise: the API can return an array, or an object with a results/streams key
-    let items = [];
-    if (Array.isArray(data)) {
-        items = data;
-    } else if (data.results) {
-        items = Array.isArray(data.results) ? data.results : [data.results];
-    } else if (data.streams) {
-        items = Array.isArray(data.streams) ? data.streams : [data.streams];
-    } else if (data.links) {
-        items = Array.isArray(data.links) ? data.links : [data.links];
-    } else if (typeof data === 'object' && Object.keys(data).length > 0) {
-        items = [data];
-    }
-
-    if (!items.length) {
-        content.innerHTML = `<div class="stream-empty"><div class="stream-empty-icon">📭</div><div class="stream-empty-title">No streams found</div><div class="stream-empty-sub">No online streams available for "<b>${escapeHTML(title || '')}</b>" right now.</div></div>`;
-        return;
-    }
-
-    content.innerHTML = '';
-
-    items.forEach((item, idx) => {
-        const card = document.createElement('div');
-        card.className = 'stream-source-card';
-
-        const streamName = item.title || item.name || item.source || item.provider || `Stream ${idx + 1}`;
-        let fieldsHtml = '';
-        const actions = [];
-
-        const URL_KEYS = new Set(['url','link','stream','stream_url','video','video_url','file','file_url','hls','hls_url','m3u8','embed','iframe','player','watch','direct','download','download_url','src','source']);
-        const BADGE_KEYS = new Set(['quality','resolution','type','format','codec','lang','language','audio','subtitle','season','episode','size','bitrate']);
-
-        Object.entries(item).forEach(([key, value]) => {
-            if (value === null || value === undefined || value === '') return;
-            const lk = key.toLowerCase().replace(/[_\-\s]+/g, '_');
-            const label = key.replace(/[_\-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-            if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('//'))) {
-                if (URL_KEYS.has(lk) || lk.includes('url') || lk.includes('link') || lk.includes('stream') || lk.includes('video') || lk.includes('file') || lk.includes('embed') || lk.includes('player') || lk.includes('download') || lk.includes('src')) {
-                    actions.push(`<a class="stream-play-btn" href="${escapeHTML(value)}" target="_blank" rel="noopener">▶ ${escapeHTML(label)}</a>`);
-                } else {
-                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val"><a href="${escapeHTML(value)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHTML(value.length > 60 ? value.slice(0, 60) + '…' : value)}</a></span></div>`;
-                }
-            } else if (typeof value === 'string' || typeof value === 'number') {
-                const sval = String(value);
-                if (BADGE_KEYS.has(lk)) {
-                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-badge">${escapeHTML(sval)}</span></div>`;
-                } else {
-                    fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val">${escapeHTML(sval)}</span></div>`;
-                }
-            } else if (Array.isArray(value) && value.length > 0) {
-                const vals = value.map(v => {
-                    if (typeof v === 'string' && v.startsWith('http')) return `<a href="${escapeHTML(v)}" target="_blank" rel="noopener" style="color:var(--accent)">${escapeHTML(v.length > 40 ? v.slice(0,40)+'…' : v)}</a>`;
-                    return escapeHTML(String(v));
-                });
-                fieldsHtml += `<div class="stream-field"><b>${escapeHTML(label)}:</b><span class="stream-field-val">${vals.join(', ')}</span></div>`;
-            } else if (typeof value === 'object') {
-                Object.entries(value).forEach(([k2, v2]) => {
-                    if (!v2) return;
-                    const l2 = (key + ' ' + k2).replace(/[_\-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    if (typeof v2 === 'string' && v2.startsWith('http')) {
-                        actions.push(`<a class="stream-play-btn" href="${escapeHTML(v2)}" target="_blank" rel="noopener">▶ ${escapeHTML(l2)}</a>`);
-                    } else {
-                        fieldsHtml += `<div class="stream-field"><b>${escapeHTML(l2)}:</b><span class="stream-field-val">${escapeHTML(String(v2))}</span></div>`;
-                    }
-                });
-            }
-        });
-
-        card.innerHTML = `
-            <div class="stream-source-title">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                ${escapeHTML(streamName)}
-            </div>
-            ${fieldsHtml}
-            ${actions.length ? `<div class="stream-actions">${actions.join('')}</div>` : ''}
-        `;
-        content.appendChild(card);
-    });
 }
 
 function getFile(fileId) {
