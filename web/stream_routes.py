@@ -1,4 +1,5 @@
 import math
+import multimovies_api
 import secrets
 import mimetypes
 import urllib.parse
@@ -332,7 +333,9 @@ async def build_tmdb_details(session, media_type, tmdb_id):
             "flatrate": [p.get("provider_name") for p in providers.get("flatrate", [])[:8]],
             "rent": [p.get("provider_name") for p in providers.get("rent", [])[:8]],
             "buy": [p.get("provider_name") for p in providers.get("buy", [])[:8]]
-        }
+        },
+        "number_of_seasons": data.get("number_of_seasons"),
+        "seasons": [{"season_number": s.get("season_number"), "episode_count": s.get("episode_count")} for s in data.get("seasons", [])] if data.get("seasons") else []
     }
 
 async def build_mal_details(session, mal_id):
@@ -386,7 +389,9 @@ async def build_mal_details(session, mal_id):
         "keywords": [x.get("name") for x in (anime.get("themes", []) + anime.get("demographics", [])) if x.get("name")],
         "links": {"mal": anime.get("url")},
         "external": {"myanimelist": {"rank": anime.get("rank"), "popularity": anime.get("popularity"), "members": anime.get("members")}},
-        "providers": {}
+        "providers": {},
+        "number_of_seasons": 1,
+        "seasons": [{"season_number": 1, "episode_count": anime.get("episodes") or 12}]
     }
 
 @routes.get("/watch/{message_id}")
@@ -544,7 +549,7 @@ MULTIMOVIES_API = "https://multimoviesapis.vercel.app/api"
 
 @routes.get("/api/watch-online")
 async def watch_online_handler(request):
-    """Proxy streaming data from multimoviesapis.vercel.app for a given title."""
+    """Resolve and return MultiMovies slug for a given title."""
     title = request.query.get("title", "").strip()
     year  = request.query.get("year", "").strip()
     mtype = request.query.get("type", "movie").strip()
@@ -553,67 +558,14 @@ async def watch_online_handler(request):
     if not title:
         return web.json_response({"error": "Missing title"}, status=400)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; Filmotainment/1.0)",
-        "Accept": "application/json",
-    }
+    # Resolve MultiMovies slug
+    best_match = await multimovies_api.find_best_match(title)
+    if best_match:
+        slug = best_match.get("slug")
+    else:
+        slug = multimovies_api._slugify(title)
 
-    async def _try(url, params=None):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url, params=params, headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=15)
-                ) as resp:
-                    if resp.status >= 400:
-                        return None
-                    ct = resp.headers.get("Content-Type", "")
-                    if "json" in ct:
-                        return await resp.json(content_type=None)
-                    text = await resp.text()
-                    try:
-                        import json as _json
-                        return _json.loads(text)
-                    except Exception:
-                        return None
-        except Exception:
-            return None
-
-    # Try several common endpoint patterns the API might expose
-    candidates = []
-
-    # 1. Search-style endpoint
-    q = f"{title} {year}".strip() if year else title
-    candidates.append((f"{MULTIMOVIES_API}/search", {"q": q, "query": q, "title": title, "year": year, "type": mtype}))
-
-    # 2. Movie/TV-specific endpoint
-    ep = "tv" if mtype in ("tv", "anime") else "movie"
-    candidates.append((f"{MULTIMOVIES_API}/{ep}", {"title": title, "year": year, "query": title}))
-
-    # 3. TMDB-ID based endpoint
-    if mid:
-        candidates.append((f"{MULTIMOVIES_API}/tmdb/{mid}", {"type": mtype}))
-        candidates.append((f"{MULTIMOVIES_API}/stream", {"tmdb_id": mid, "title": title, "type": mtype}))
-
-    # 4. Generic stream endpoint
-    candidates.append((f"{MULTIMOVIES_API}/stream", {"title": title, "year": year, "type": mtype}))
-    candidates.append((f"{MULTIMOVIES_API}/links", {"title": title, "year": year}))
-
-    data = None
-    for url, params in candidates:
-        clean_params = {k: v for k, v in params.items() if v}
-        result = await _try(url, clean_params)
-        if result and result != {} and result != []:
-            # Filter out pure error responses
-            if isinstance(result, dict) and result.get("error") and len(result) == 1:
-                continue
-            data = result
-            break
-
-    if data is None:
-        return web.json_response([], status=200)
-
-    return web.json_response(data)
+    return web.json_response({"slug": slug, "title": title})
 
 
 @routes.get("/", allow_head=True)
