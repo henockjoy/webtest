@@ -5,7 +5,7 @@ import urllib.parse
 import html
 import re
 
-1
+
 webapp_template = """
 <!DOCTYPE html>
 <html lang="en">
