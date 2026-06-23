@@ -2283,7 +2283,7 @@ async function openWatchOnline() {
 
 function renderMoviePlayCard(slug) {
     const content = document.getElementById('streamContent');
-    const playerUrl = `https://multimoviesapis.vercel.app/api/player/${slug}?type=movie&title=${encodeURIComponent(currentItem.title)}`;
+    const playerUrl = `https://moviesapi.proyato.com/api/player/${slug}?type=movie&title=${encodeURIComponent(currentItem.title)}`;
     content.innerHTML = `
         <div class="movie-play-card fade-up">
             <div class="movie-play-title">${escapeHTML(currentItem.title)}</div>
@@ -2327,7 +2327,7 @@ function renderTVSelector(slug) {
             const btn = document.createElement('button');
             btn.className = 'episode-grid-btn';
             btn.textContent = ep;
-            const playerUrl = `https://multimoviesapis.vercel.app/api/player/${slug}?type=tv&season=${seasonNum}&episode=${ep}&title=${encodeURIComponent(currentItem.title)}`;
+            const playerUrl = `https://moviesapi.proyato.com/api/player/${slug}?type=tv&season=${seasonNum}&episode=${ep}&title=${encodeURIComponent(currentItem.title)}`;
             btn.onclick = () => {
                 window.open(playerUrl, '_blank');
                 closeStreamPanel();
